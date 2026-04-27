@@ -41,11 +41,11 @@
 #define HMI_EXP_PHASE_S         (HMI_EXP_PHASE_MS / 1000U)
 #define HMI_EXP_PHASE_COUNT     (8U)
 
-/* Yaw rate (deg/s) for each phase. Positive = right turn (yaw increases).
- * Equivalent to "1° increment every N ms" where N = 1000/rate. */
+/* Yaw rate (deg/s) for each phase. Negative = left turn (yaw decreases).
+ * Equivalent to "1° increment every N ms" where N = 1000/|rate|. */
 static const float hmi_exp_yaw_rate_table[HMI_EXP_PHASE_COUNT] =
 {
-    0.0f, 10.0f, 20.0f, 40.0f, 60.0f, 80.0f, 100.0f, 130.0f
+    0.0f, -10.0f, -20.0f, -40.0f, -60.0f, -80.0f, -100.0f, -130.0f
 };
 
 static uint8  hmi_display_mode = 0U;
