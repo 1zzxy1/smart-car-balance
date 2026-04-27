@@ -23,6 +23,7 @@ extern float yaw_target;
 extern float yaw_error;
 extern uint8 balance_enabled;
 extern uint8 balance_zero_calibrated;
+extern uint8 balance_fallen;
 
 void balance_init(void);
 void balance_set_enabled(uint8 enabled);

@@ -55,6 +55,7 @@ float yaw_target = 0.0f;
 float yaw_error = 0.0f;
 uint8 balance_enabled = 0U;
 uint8 balance_zero_calibrated = 1U;
+uint8 balance_fallen = 0U;
 
 static float steering_output = 0.0f;
 static float target_yaw_smooth = 0.0f;
@@ -348,6 +349,7 @@ void balance_gyro_loop(void)
     if ((balance_angle_feedback > BALANCE_FALL_THRESHOLD) ||
         (balance_angle_feedback < -BALANCE_FALL_THRESHOLD))
     {
+        balance_fallen = 1U;
         motor_set_enabled(0U);
         balance_apply_servo_output(0.0f);
         return;

@@ -181,6 +181,7 @@ static void hmi_update_inputs(void)
         hmi_experiment_active = 1U;
         hmi_experiment_start_tick = uwtick;
         hmi_experiment_phase = 0U;
+        balance_fallen = 0U;
         balance_set_steering_active(1U);
         balance_set_expect_angle(hmi_exp_angle_table[0]);
     }
@@ -200,7 +201,7 @@ static void hmi_run_experiment(void)
     uint32 elapsed;
     uint32 phase;
 
-    if (!hmi_experiment_active)
+    if (!hmi_experiment_active || balance_fallen)
     {
         return;
     }
@@ -223,6 +224,13 @@ static void hmi_run_experiment(void)
 static void hmi_update_display(void)
 {
     uint8 status_ok = (imu_ready && (!hmi_motor_enabled || motor_driver_online)) ? 1U : 0U;
+    uint8 i;
+    char marker;
+
+    if (balance_fallen)
+    {
+        return;
+    }
 
     if (hmi_display_mode != hmi_display_mode_last)
     {
@@ -243,14 +251,13 @@ static void hmi_update_display(void)
     }
     else
     {
-        hmi_show_line(0, "GYX :%7.2f GYY:%7.2f", gyro_x_rate, gyro_y_rate);
-        hmi_show_line(1, "GYZ :%7.2f YAW:%7.2f", gyro_z_rate, yaw);
-        hmi_show_line(2, "LRPM:%6d RRPM:%6d", motor_driver_left_rpm, motor_driver_right_rpm);
-        hmi_show_line(3, "EFB :%6d ETOT:%6ld", encoder_data_2, (long)encoder_physical_total);
-        hmi_show_line(4, "FGYR:%6.2f MDU:%5d", balance_filtered_gyro, motor_last_duty);
-        hmi_show_line(5, "TANG:%6.2f TGYR:%6.2f", target_angle, target_gyro);
-        hmi_show_line(6, "SOUT:%6.2f SPWM:%5lu", servo_output, (unsigned long)servo_last_duty);
-        hmi_show_line(7, "T:%6lu %s", (unsigned long)uwtick, motor_driver_online ? "OK" : "NG");
+        for (i = 0U; i < HMI_EXP_PHASE_COUNT; i++)
+        {
+            marker = (hmi_experiment_active && (i == hmi_experiment_phase)) ? '>' : ' ';
+            hmi_show_line(i, "%cPH%u %+5.1f  %u-%us",
+                          marker, i, hmi_exp_angle_table[i],
+                          (unsigned)(i * 5U), (unsigned)((i + 1U) * 5U));
+        }
     }
 }
 
