@@ -213,13 +213,18 @@ static void hmi_update_display(void)
 
 static void hmi_send_telemetry(void)
 {
-    hmi_sendf("t,pit,afb,gy,fgy,tgy,out,ts,as,yaw,ye,str:"
-              "%lu,%.1f,%.1f,%.1f,%.1f,%.1f,%.0f,%d,%d,%.1f,%.1f,%.2f\r\n",
-              (unsigned long)uwtick, pitch, balance_angle_feedback,
-              gyro_y_rate, balance_filtered_gyro,
-              target_gyro, servo_output,
-              motor_target_speed, motor_actual_speed,
-              yaw, yaw_error, steering_pid.out);
+    hmi_sendf("{t}:%lu\r\n", (unsigned long)uwtick);
+    hmi_sendf("{pit}:%.2f\r\n", pitch);
+    hmi_sendf("{afb}:%.2f\r\n", balance_angle_feedback);
+    hmi_sendf("{gy}:%.1f\r\n", gyro_y_rate);
+    hmi_sendf("{fgy}:%.1f\r\n", balance_filtered_gyro);
+    hmi_sendf("{tgy}:%.1f\r\n", target_gyro);
+    hmi_sendf("{out}:%.0f\r\n", servo_output);
+    hmi_sendf("{ts}:%d\r\n", motor_target_speed);
+    hmi_sendf("{as}:%d\r\n", motor_actual_speed);
+    hmi_sendf("{yaw}:%.1f\r\n", yaw);
+    hmi_sendf("{ye}:%.1f\r\n", yaw_error);
+    hmi_sendf("{str}:%.2f\r\n", steering_pid.out);
 }
 
 void hmi_init(void)

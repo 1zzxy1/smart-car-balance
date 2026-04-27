@@ -41,6 +41,7 @@ int core0_main(void)
     ips114_show_string(0, 80, "STEP: HMI");
 
     wireless_uart_init();
+    wireless_uart_send_string("BOOT OK\r\n");
     hmi_init();
     scheduler_init();
 
