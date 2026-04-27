@@ -1,0 +1,2 @@
+Seekfree_TC264_dual_camera_Opensource_Library     // 双摄主板 BTB主板开源库
+Seekfree_TC264_general_Opensource_Library         // 通用主板开源库

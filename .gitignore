@@ -1,0 +1,15 @@
+# Build output
+Debug/
+
+# IDE internal
+.ads/
+.settings/
+.serena/
+.spec-workflow/
+
+# Claude Code
+.claude/
+
+# Temp / data
+data_raw.txt
+*.tmp

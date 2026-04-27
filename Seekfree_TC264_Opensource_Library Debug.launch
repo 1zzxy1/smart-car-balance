@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="com.rt.hightec.agent.launcher.launchConfigurationType">
+    <stringAttribute key="ACC_HW" value="DAS JDS TriBoard TC3XX V2.0 TB96EF7X"/>
+    <booleanAttribute key="ENABLE_AGENTLOG" value="false"/>
+    <booleanAttribute key="ENABLE_FLASHING" value="true"/>
+    <booleanAttribute key="ENABLE_STOPPING" value="true"/>
+    <stringAttribute key="EXECUTABLE_PATH" value="${project_loc}/Debug/Seekfree_TC264_Opensource_Library.elf"/>
+    <stringAttribute key="STOP_FUNCTION" value="core0_main"/>
+    <stringAttribute key="SVD" value="C:/develop/ads/AURIX-Studio-1.10.28/build_system/bundled-artefacts-repo/svd/tc26xbpd/1.1-2/device.svd"/>
+    <stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="Seekfree_TC264_Opensource_Library"/>
+    <listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
+        <listEntry value="/Seekfree_TC264_Opensource_Library"/>
+    </listAttribute>
+    <listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
+        <listEntry value="4"/>
+    </listAttribute>
+    <stringAttribute key="org.eclipse.debug.ui.ATTR_LOCATION" value="/Seekfree_TC264_Opensource_Library/Seekfree_TC264_Opensource_Library Debug.launch"/>
+    <stringAttribute key="org.eclipse.debug.ui.ATTR_PROJECT_NAME" value="Seekfree_TC264_Opensource_Library"/>
+    <booleanAttribute key="org.eclipse.debug.ui.ATTR_SHARED" value="true"/>
+    <stringAttribute key="org.eclipse.tcf.debug.MemoryMap" value="[{&quot;FileName&quot;:&quot;C:/Users/suiyungui/Desktop/Seekfree_TC264_Opensource_Library/Debug/Seekfree_TC264_Opensource_Library.elf&quot;,&quot;ID&quot;:&quot;/DAS JDS TriBoard TC3XX V2.0 TB96EF7X/Core 0: CPU0 TriCore 1.6E&quot;,&quot;Flags&quot;:0,&quot;UUID&quot;:&quot;27ecf906-e2f8-4576-8b64-dc8057251d33&quot;},{&quot;FileName&quot;:&quot;C:/Users/suiyungui/Desktop/Seekfree_TC264_Opensource_Library/Debug/Seekfree_TC264_Opensource_Library.elf&quot;,&quot;ID&quot;:&quot;/DAS JDS TriBoard TC3XX V2.0 TB96EF7X/Core 0: CPU0 TriCore 1.6E&quot;,&quot;Flags&quot;:0,&quot;UUID&quot;:&quot;7c51e378-dfad-4adb-b10b-b127dd9d3af7&quot;},{&quot;FileName&quot;:&quot;C:/Users/suiyungui/Desktop/Seekfree_TC264_Opensource_Library/Debug/Seekfree_TC264_Opensource_Library.elf&quot;,&quot;ID&quot;:&quot;/DAS JDS TriBoard TC3XX V2.0 TB96EF7X/Core 0: CPU0 TriCore 1.6E&quot;,&quot;Flags&quot;:0,&quot;UUID&quot;:&quot;e5bfabbb-9866-4be7-ac43-5b848eb6e4be&quot;},{&quot;FileName&quot;:&quot;C:/Users/suiyungui/Desktop/Seekfree_TC264_Opensource_Library/Debug/Seekfree_TC264_Opensource_Library.elf&quot;,&quot;ID&quot;:&quot;/DAS JDS TriBoard TC3XX V2.0 TB96EF7X/Core 1: CPU1 TriCore 1.6P&quot;,&quot;Flags&quot;:0,&quot;UUID&quot;:&quot;ad357c9c-596b-4197-b0ae-1159e96cc4c3&quot;},{&quot;FileName&quot;:&quot;C:/Users/suiyungui/Desktop/Seekfree_TC264_Opensource_Library/Debug/Seekfree_TC264_Opensource_Library.elf&quot;,&quot;ID&quot;:&quot;/DAS JDS TriBoard TC3XX V2.0 TB96EF7X/Core 0: CPU0 TriCore 1.6E&quot;,&quot;Flags&quot;:0,&quot;UUID&quot;:&quot;5d26618e-fdab-494f-a155-f34c2c1ba889&quot;},{&quot;FileName&quot;:&quot;C:/Users/suiyungui/Desktop/Seekfree_TC264_Opensource_Library/Debug/Seekfree_TC264_Opensource_Library.elf&quot;,&quot;ID&quot;:&quot;/DAS JDS TriBoard TC3XX V2.0 TB96EF7X/Core 1: CPU1 TriCore 1.6P&quot;,&quot;Flags&quot;:0,&quot;UUID&quot;:&quot;ce8a2296-bd88-47b5-815c-894554060046&quot;}]"/>
+    <stringAttribute key="org.eclipse.tcf.debug.PeerID" value="TCP:127.0.0.1:1534"/>
+    <stringAttribute key="org.eclipse.tcf.debug.ProjectName" value="Seekfree_TC264_Opensource_Library"/>
+    <booleanAttribute key="org.eclipse.tcf.debug.RunLocalAgent" value="false"/>
+    <booleanAttribute key="org.eclipse.tcf.debug.RunLocalServer" value="false"/>
+    <booleanAttribute key="org.eclipse.tcf.debug.UseLocalAgent" value="false"/>
+    <stringAttribute key="org.eclipse.tcf.debug.executable_name" value="${project_loc}/Debug/Seekfree_TC264_Opensource_Library.elf"/>
+    <stringAttribute key="sessionID" value="c20d85c0-134b-4775-8597-953c5cf48e96"/>
+</launchConfiguration>
