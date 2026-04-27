@@ -37,16 +37,17 @@
 
 #define HMI_YAW_LOCK_DELAY_MS   (500U)
 
-#define HMI_EXP_PHASE_MS        (2000U)
-#define HMI_EXP_PHASE_S         (HMI_EXP_PHASE_MS / 1000U)
-#define HMI_EXP_PHASE_COUNT     (8U)
+#define LEAN_TEST_STRAIGHT_MS   (2000U)
+#define LEAN_TEST_STEP_MS       (2000U)
+#define LEAN_TEST_STEP_DEG      (5.0f)
+#define LEAN_TEST_MAX_DEG       (20.0f)
 
-/* Yaw rate (deg/s) for each phase. Negative = left turn (yaw decreases).
- * Equivalent to "1° increment every N ms" where N = 1000/|rate|. */
-static const float hmi_exp_yaw_rate_table[HMI_EXP_PHASE_COUNT] =
+typedef enum
 {
-    0.0f, -10.0f, -20.0f, -40.0f, -60.0f, -80.0f, -100.0f, -130.0f
-};
+    LEAN_TEST_IDLE = 0,
+    LEAN_TEST_STRAIGHT,
+    LEAN_TEST_LEANING,
+} lean_test_phase_e;
 
 static uint8  hmi_display_mode = 0U;
 static uint8  hmi_display_mode_last = 0xFFU;
@@ -57,12 +58,9 @@ static uint32 hmi_last_telemetry_tick = 0U;
 static uint32 hmi_last_driver_refresh_tick = 0U;
 static uint8  hmi_yaw_lock_pending = 0U;
 static uint32 hmi_yaw_lock_tick = 0U;
-static uint8  hmi_experiment_active = 0U;
-static uint32 hmi_experiment_start_tick = 0U;
-static uint8  hmi_experiment_phase = 0U;
-static float  hmi_exp_yaw_integrated = 0.0f;
-static uint32 hmi_exp_last_tick = 0U;
-static uint8  hmi_exp_integrator_initialized = 0U;
+static lean_test_phase_e lean_test_phase = LEAN_TEST_IDLE;
+static uint32 lean_test_step_tick = 0U;
+static float  lean_test_target = 0.0f;
 
 static const gpio_pin_enum hmi_key_pins[KEY_NUMBER] = KEY_LIST;
 static uint32 hmi_key_last_trigger[KEY_NUMBER] = {0U};
@@ -183,87 +181,24 @@ static void hmi_update_inputs(void)
         }
         hmi_yaw_lock_pending = 1U;
         hmi_yaw_lock_tick = uwtick;
-
-        hmi_experiment_active = 1U;
-        hmi_experiment_start_tick = uwtick;
-        hmi_experiment_phase = 0U;
-        hmi_exp_integrator_initialized = 0U;
-        balance_fallen = 0U;
-        balance_set_steering_active(1U);
-        balance_set_expect_angle(0.0f);
     }
     else if (!new_motor_enabled && hmi_motor_enabled)
     {
+        /* SW2 下降沿：关电机，复位压弯测试，重新启用航向环 */
         motor_set_enabled(0U);
-        hmi_experiment_active = 0U;
-        balance_set_steering_active(1U);
+        balance_set_steering_enabled(1U);
         balance_set_expect_angle(0.0f);
+        lean_test_phase = LEAN_TEST_IDLE;
+        lean_test_target = 0.0f;
+        hmi_yaw_lock_pending = 0U;
     }
 
     hmi_motor_enabled = new_motor_enabled;
 }
 
-static void hmi_run_experiment(void)
-{
-    uint32 elapsed;
-    uint32 phase;
-    uint32 dt_ms;
-    float dt_s;
-    float rate;
-
-    if (!hmi_experiment_active || balance_fallen)
-    {
-        return;
-    }
-
-    elapsed = uwtick - hmi_experiment_start_tick;
-    phase = elapsed / HMI_EXP_PHASE_MS;
-    if (phase >= HMI_EXP_PHASE_COUNT)
-    {
-        phase = HMI_EXP_PHASE_COUNT - 1U;
-    }
-
-    if ((uint8)phase != hmi_experiment_phase)
-    {
-        hmi_experiment_phase = (uint8)phase;
-    }
-
-    if (hmi_experiment_phase == 0U)
-    {
-        return;
-    }
-
-    if (!hmi_exp_integrator_initialized)
-    {
-        hmi_exp_yaw_integrated = yaw_target;
-        hmi_exp_last_tick = uwtick;
-        hmi_exp_integrator_initialized = 1U;
-        return;
-    }
-
-    dt_ms = uwtick - hmi_exp_last_tick;
-    hmi_exp_last_tick = uwtick;
-    if (dt_ms > 100U)
-    {
-        return;
-    }
-
-    dt_s = (float)dt_ms * 0.001f;
-    rate = hmi_exp_yaw_rate_table[hmi_experiment_phase];
-    hmi_exp_yaw_integrated = normalize_angle(hmi_exp_yaw_integrated + rate * dt_s);
-    balance_set_yaw_target_now(hmi_exp_yaw_integrated);
-}
-
 static void hmi_update_display(void)
 {
     uint8 status_ok = (imu_ready && (!hmi_motor_enabled || motor_driver_online)) ? 1U : 0U;
-    uint8 i;
-    char marker;
-
-    if (balance_fallen)
-    {
-        return;
-    }
 
     if (hmi_display_mode != hmi_display_mode_last)
     {
@@ -280,36 +215,30 @@ static void hmi_update_display(void)
         hmi_show_line(4, "AFB:%6.2f STR:%5.2f", balance_angle_feedback, steering_pid.out);
         hmi_show_line(5, "TG_A:%6.2f TG_G:%6.2f", target_angle, target_gyro);
         hmi_show_line(6, "OUT :%6.2f PWM:%5lu", servo_output, (unsigned long)servo_last_duty);
-        hmi_show_line(7, "PH:%u R:%+6.1f L:%+5.1f %s",
-                      hmi_experiment_phase,
-                      hmi_exp_yaw_rate_table[hmi_experiment_phase],
-                      steering_pid.out,
-                      status_ok ? "OK" : "NG");
+        hmi_show_line(7, "T:%5lu LN:%4.1f %s", (unsigned long)uwtick, lean_test_target, status_ok ? "OK" : "NG");
     }
     else
     {
-        for (i = 0U; i < HMI_EXP_PHASE_COUNT; i++)
-        {
-            marker = (hmi_experiment_active && (i == hmi_experiment_phase)) ? '>' : ' ';
-            hmi_show_line(i, "%cPH%u %+6.1f/s %u-%us",
-                          marker, i, hmi_exp_yaw_rate_table[i],
-                          (unsigned)(i * HMI_EXP_PHASE_S),
-                          (unsigned)((i + 1U) * HMI_EXP_PHASE_S));
-        }
+        hmi_show_line(0, "GYX :%7.2f GYY:%7.2f", gyro_x_rate, gyro_y_rate);
+        hmi_show_line(1, "GYZ :%7.2f YAW:%7.2f", gyro_z_rate, yaw);
+        hmi_show_line(2, "LRPM:%6d RRPM:%6d", motor_driver_left_rpm, motor_driver_right_rpm);
+        hmi_show_line(3, "EFB :%6d ETOT:%6ld", encoder_data_2, (long)encoder_physical_total);
+        hmi_show_line(4, "FGYR:%6.2f MDU:%5d", balance_filtered_gyro, motor_last_duty);
+        hmi_show_line(5, "TANG:%6.2f TGYR:%6.2f", target_angle, target_gyro);
+        hmi_show_line(6, "SOUT:%6.2f SPWM:%5lu", servo_output, (unsigned long)servo_last_duty);
+        hmi_show_line(7, "T:%6lu %s", (unsigned long)uwtick, motor_driver_online ? "OK" : "NG");
     }
 }
 
 static void hmi_send_telemetry(void)
 {
-    hmi_sendf("t,ph,yr,pit,afb,tang,gy,fgy,tgy,out,pwm,ts,as,yaw,yt,ye,str:"
-              "%lu,%u,%.1f,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.0f,%lu,%d,%d,%.1f,%.1f,%.1f,%.2f\r\n",
-              (unsigned long)uwtick, hmi_experiment_phase,
-              hmi_exp_yaw_rate_table[hmi_experiment_phase],
-              pitch, balance_angle_feedback,
+    hmi_sendf("t,pit,afb,tang,gy,fgy,tgy,out,pwm,ts,as,yaw,ye,str:"
+              "%lu,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.0f,%lu,%d,%d,%.1f,%.1f,%.2f\r\n",
+              (unsigned long)uwtick, pitch, balance_angle_feedback,
               target_angle, gyro_y_rate, balance_filtered_gyro,
               target_gyro, servo_output, (unsigned long)servo_last_duty,
               motor_target_speed, motor_actual_speed,
-              yaw, yaw_target, yaw_error, steering_pid.out);
+              yaw, yaw_error, steering_pid.out);
 }
 
 void hmi_init(void)
@@ -340,9 +269,34 @@ void hmi_proc(void)
     {
         balance_lock_yaw_target();
         hmi_yaw_lock_pending = 0U;
+
+        /* yaw 锁定后进入直行阶段，2s 后开始压弯测试 */
+        lean_test_phase = LEAN_TEST_STRAIGHT;
+        lean_test_step_tick = uwtick;
+        lean_test_target = 0.0f;
+        balance_set_expect_angle(0.0f);
     }
 
-    hmi_run_experiment();
+    if (lean_test_phase == LEAN_TEST_STRAIGHT &&
+        ((uwtick - lean_test_step_tick) >= LEAN_TEST_STRAIGHT_MS))
+    {
+        lean_test_phase = LEAN_TEST_LEANING;
+        lean_test_step_tick = uwtick;
+        lean_test_target = LEAN_TEST_STEP_DEG;
+        balance_set_expect_angle(lean_test_target);
+        balance_set_steering_enabled(0U);
+    }
+    else if (lean_test_phase == LEAN_TEST_LEANING &&
+        ((uwtick - lean_test_step_tick) >= LEAN_TEST_STEP_MS))
+    {
+        lean_test_step_tick = uwtick;
+        lean_test_target += LEAN_TEST_STEP_DEG;
+        if (lean_test_target > LEAN_TEST_MAX_DEG)
+        {
+            lean_test_target = LEAN_TEST_MAX_DEG;
+        }
+        balance_set_expect_angle(lean_test_target);
+    }
 
     if ((uwtick - hmi_last_driver_refresh_tick) >= HMI_DRIVER_REFRESH_MS)
     {

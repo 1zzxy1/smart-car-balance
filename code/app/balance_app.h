@@ -23,15 +23,13 @@ extern float yaw_target;
 extern float yaw_error;
 extern uint8 balance_enabled;
 extern uint8 balance_zero_calibrated;
-extern uint8 balance_fallen;
 
 void balance_init(void);
 void balance_set_enabled(uint8 enabled);
 void balance_lock_angle_zero(void);
 void balance_lock_yaw_target(void);
+void balance_set_steering_enabled(uint8 enabled);
 void balance_set_expect_angle(float angle);
-void balance_set_steering_active(uint8 active);
-void balance_set_yaw_target_now(float yaw);
 void balance_set_servo_test_enabled(uint8 enabled);
 void balance_set_servo_test_offset(int16 offset);
 void balance_steering_loop(void);

@@ -14,14 +14,14 @@
 #include "servo_app.h"
 
 #define BALANCE_EXPECT_ANGLE_DEFAULT (0.0f)
-#define BALANCE_FALL_THRESHOLD      (35.0f)
+#define BALANCE_FALL_THRESHOLD      (25.0f)
 
 #define BALANCE_HEADING_STEP        (1.5f)
 
 #define BALANCE_STEERING_KP         (0.15f)
 #define BALANCE_STEERING_KI         (0.0f)
 #define BALANCE_STEERING_KD         (0.05f)
-#define BALANCE_STEERING_OUT_LIMIT  (25.0f)
+#define BALANCE_STEERING_OUT_LIMIT  (8.0f)
 #define BALANCE_STEERING_INT_LIMIT  (20.0f)
 
 #define BALANCE_ANGLE_KP            (8.3f)
@@ -55,11 +55,10 @@ float yaw_target = 0.0f;
 float yaw_error = 0.0f;
 uint8 balance_enabled = 0U;
 uint8 balance_zero_calibrated = 1U;
-uint8 balance_fallen = 0U;
 
 static float steering_output = 0.0f;
 static float target_yaw_smooth = 0.0f;
-static uint8 steering_active = 1U;
+static uint8 balance_steering_enabled = 1U;
 static uint8 balance_servo_test_enabled = 0U;
 static int16 balance_servo_test_offset = 0;
 static float gyro_filtered = 0.0f;
@@ -198,16 +197,10 @@ void balance_lock_yaw_target(void)
     pid_reset(&steering_pid);
 }
 
-void balance_set_yaw_target_now(float yaw_value)
+void balance_set_steering_enabled(uint8 enabled)
 {
-    yaw_target = yaw_value;
-    target_yaw_smooth = yaw_value;
-}
-
-void balance_set_steering_active(uint8 active)
-{
-    steering_active = active ? 1U : 0U;
-    if (!steering_active)
+    balance_steering_enabled = enabled ? 1U : 0U;
+    if (!balance_steering_enabled)
     {
         steering_output = 0.0f;
         yaw_error = 0.0f;
@@ -221,7 +214,7 @@ void balance_steering_loop(void)
     float heading_error;
     float steer_error;
 
-    if (!balance_enabled || !steering_active)
+    if (!balance_enabled || !balance_steering_enabled)
     {
         steering_output = 0.0f;
         yaw_error = 0.0f;
@@ -355,7 +348,6 @@ void balance_gyro_loop(void)
     if ((balance_angle_feedback > BALANCE_FALL_THRESHOLD) ||
         (balance_angle_feedback < -BALANCE_FALL_THRESHOLD))
     {
-        balance_fallen = 1U;
         motor_set_enabled(0U);
         balance_apply_servo_output(0.0f);
         return;
