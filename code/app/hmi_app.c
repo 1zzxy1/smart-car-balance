@@ -21,7 +21,7 @@
 
 #define HMI_TASK_PERIOD_MS          (10U)
 #define HMI_DISPLAY_PERIOD_MS       (100U)
-#define HMI_TELEMETRY_PERIOD_MS     (10U)
+#define HMI_TELEMETRY_PERIOD_MS     (50U)
 #define HMI_DRIVER_REFRESH_MS       (50U)
 
 #define HMI_SPEED_STEP              (50)
