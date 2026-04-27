@@ -10,20 +10,22 @@
 #include "balance_app.h"
 
 #include "imu_app.h"
+#include "motor_app.h"
 #include "servo_app.h"
 
 #define BALANCE_EXPECT_ANGLE_DEFAULT (0.0f)
+#define BALANCE_FALL_THRESHOLD      (25.0f)
 
 #define BALANCE_HEADING_STEP        (1.5f)
 
 #define BALANCE_STEERING_KP         (0.15f)
 #define BALANCE_STEERING_KI         (0.0f)
 #define BALANCE_STEERING_KD         (0.05f)
-#define BALANCE_STEERING_OUT_LIMIT  (3.5f)
+#define BALANCE_STEERING_OUT_LIMIT  (8.0f)
 #define BALANCE_STEERING_INT_LIMIT  (20.0f)
 
 #define BALANCE_ANGLE_KP            (8.3f)
-#define BALANCE_ANGLE_KI            (0.005f)
+#define BALANCE_ANGLE_KI            (0.02f)
 #define BALANCE_ANGLE_KD            (-0.3f)
 #define BALANCE_ANGLE_OUT_LIMIT     (150.0f)
 #define BALANCE_ANGLE_INT_LIMIT     (30.0f)
@@ -33,7 +35,7 @@
 #define BALANCE_GYRO_KD             (0.0f)
 #define BALANCE_GYRO_OUT_LIMIT      (2640.0f)
 #define BALANCE_GYRO_INPUT_LIMIT    (800.0f)
-#define BALANCE_GYRO_LPF_ALPHA      (0.20f)
+#define BALANCE_GYRO_LPF_ALPHA      (0.40f)
 
 #define BALANCE_SERVO_SAFE_LIMIT    (1650.0f)
 
@@ -326,6 +328,14 @@ void balance_gyro_loop(void)
         gyro_pid.integral = 0.0f;
         gyro_pid.last_error = 0.0f;
         gyro_pid.out = 0.0f;
+        balance_apply_servo_output(0.0f);
+        return;
+    }
+
+    if ((balance_angle_feedback > BALANCE_FALL_THRESHOLD) ||
+        (balance_angle_feedback < -BALANCE_FALL_THRESHOLD))
+    {
+        motor_set_enabled(0U);
         balance_apply_servo_output(0.0f);
         return;
     }
