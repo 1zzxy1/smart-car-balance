@@ -35,7 +35,7 @@
 #define BALANCE_GYRO_INPUT_LIMIT    (800.0f)
 #define BALANCE_GYRO_LPF_ALPHA      (0.20f)
 
-#define BALANCE_SERVO_SAFE_LIMIT    (990.0f)
+#define BALANCE_SERVO_SAFE_LIMIT    (1650.0f)
 
 PID_T steering_pid;
 PID_T angle_pid;
