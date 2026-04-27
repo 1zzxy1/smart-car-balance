@@ -57,7 +57,7 @@ static uint8 hmi_switch_active(gpio_pin_enum pin)
 
 static void hmi_sendf(const char *format, ...)
 {
-    char buffer[128];
+    char buffer[256];
     va_list args;
     int length;
 
@@ -213,12 +213,13 @@ static void hmi_update_display(void)
 
 static void hmi_send_telemetry(void)
 {
-    hmi_sendf("t,pit,tang,gy,tgy,out,pwm,ts,as,du,yaw,ye:"
-              "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%lu,%d,%d,%d,%.2f,%.2f\r\n",
-              (unsigned long)uwtick, pitch, target_angle, gyro_y_rate,
+    hmi_sendf("t,pit,afb,tang,gy,fgy,tgy,out,pwm,ts,as,yaw,ye,str:"
+              "%lu,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.0f,%lu,%d,%d,%.1f,%.1f,%.2f\r\n",
+              (unsigned long)uwtick, pitch, balance_angle_feedback,
+              target_angle, gyro_y_rate, balance_filtered_gyro,
               target_gyro, servo_output, (unsigned long)servo_last_duty,
-              motor_target_speed, motor_actual_speed, motor_last_duty,
-              yaw, yaw_error);
+              motor_target_speed, motor_actual_speed,
+              yaw, yaw_error, steering_pid.out);
 }
 
 void hmi_init(void)
