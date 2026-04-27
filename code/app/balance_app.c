@@ -21,7 +21,7 @@
 #define BALANCE_STEERING_KP         (0.15f)
 #define BALANCE_STEERING_KI         (0.0f)
 #define BALANCE_STEERING_KD         (0.05f)
-#define BALANCE_STEERING_OUT_LIMIT  (8.0f)
+#define BALANCE_STEERING_OUT_LIMIT  (25.0f)
 #define BALANCE_STEERING_INT_LIMIT  (20.0f)
 
 #define BALANCE_ANGLE_KP            (8.3f)
@@ -196,6 +196,12 @@ void balance_lock_yaw_target(void)
     target_yaw_smooth = yaw;
     steering_output = 0.0f;
     pid_reset(&steering_pid);
+}
+
+void balance_set_yaw_target_now(float yaw_value)
+{
+    yaw_target = yaw_value;
+    target_yaw_smooth = yaw_value;
 }
 
 void balance_set_steering_active(uint8 active)

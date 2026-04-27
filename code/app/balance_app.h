@@ -31,6 +31,7 @@ void balance_lock_angle_zero(void);
 void balance_lock_yaw_target(void);
 void balance_set_expect_angle(float angle);
 void balance_set_steering_active(uint8 active);
+void balance_set_yaw_target_now(float yaw);
 void balance_set_servo_test_enabled(uint8 enabled);
 void balance_set_servo_test_offset(int16 offset);
 void balance_steering_loop(void);
