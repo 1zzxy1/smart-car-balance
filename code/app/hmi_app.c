@@ -37,7 +37,8 @@
 
 #define HMI_YAW_LOCK_DELAY_MS   (500U)
 
-#define HMI_EXP_PHASE_MS        (5000U)
+#define HMI_EXP_PHASE_MS        (2000U)
+#define HMI_EXP_PHASE_S         (HMI_EXP_PHASE_MS / 1000U)
 #define HMI_EXP_PHASE_COUNT     (8U)
 
 static const float hmi_exp_angle_table[HMI_EXP_PHASE_COUNT] =
@@ -256,7 +257,8 @@ static void hmi_update_display(void)
             marker = (hmi_experiment_active && (i == hmi_experiment_phase)) ? '>' : ' ';
             hmi_show_line(i, "%cPH%u %+5.1f  %u-%us",
                           marker, i, hmi_exp_angle_table[i],
-                          (unsigned)(i * 5U), (unsigned)((i + 1U) * 5U));
+                          (unsigned)(i * HMI_EXP_PHASE_S),
+                          (unsigned)((i + 1U) * HMI_EXP_PHASE_S));
         }
     }
 }
