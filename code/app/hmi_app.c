@@ -42,7 +42,7 @@
 
 static const float hmi_exp_angle_table[HMI_EXP_PHASE_COUNT] =
 {
-    0.0f, -3.0f, -6.0f, -10.0f, -15.0f, -20.0f, -25.0f, -30.0f
+    0.0f, 3.0f, 6.0f, 10.0f, 15.0f, 20.0f, 25.0f, 30.0f
 };
 
 static uint8  hmi_display_mode = 0U;
