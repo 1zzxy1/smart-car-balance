@@ -13,7 +13,7 @@
 #include "imu_app.h"
 #include "motor_app.h"
 
-#define MISSION_GO_DISTANCE_M       (9.0f)
+#define MISSION_GO_DISTANCE_M       (2.0f)
 #define MISSION_RUN_SPEED_MPS       (1.45f)
 #define MISSION_OPEN_TURN_ANGLE     (8.0f)
 #define MISSION_RELOCK_ERROR_DEG    (20.0f)
