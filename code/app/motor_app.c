@@ -6,6 +6,15 @@
 
 #include "small_driver_uart_control.h"
 
+#ifndef M_PI
+#define M_PI (3.1415926f)
+#endif
+
+#define WHEEL_DIAMETER_M                    (0.070f)
+#define ENCODER_PULSES_PER_ENCODER_TURN     (1024.0f)
+#define ENCODER_TURNS_PER_WHEEL_TURN        (4.0f)
+#define MOTOR_SPEED_LOOP_PERIOD_S           (0.020f)
+
 #define PHYSICAL_ENCODER_SPEED_SIGN      (1)
 #define PHYSICAL_ENCODER_SPEED_SCALE_NUM (1)
 #define PHYSICAL_ENCODER_SPEED_SCALE_DEN (1)
@@ -26,6 +35,13 @@ uint8 motor_enabled = 0U;
 static uint32 motor_last_frame_counter = 0U;
 static uint8  motor_driver_stale_cycles = 0U;
 static float  motor_speed_filt = 0.0f;
+
+static float motor_speed_counts_to_wheel_rps(float speed_counts)
+{
+    return (speed_counts / ENCODER_PULSES_PER_ENCODER_TURN) /
+           ENCODER_TURNS_PER_WHEEL_TURN /
+           MOTOR_SPEED_LOOP_PERIOD_S;
+}
 
 /* 起步 kick：SW2 拨开后前 N 次 motor_speed_loop（20ms/次）强制高 duty，
  * 让电机越过静摩擦快速到速，期间不走 PID，防止慢慢爬半天启动 */
@@ -123,6 +139,68 @@ void motor_refresh_status(void)
     }
 
     small_driver_get_speed();
+}
+
+float motor_get_display_speed_mps(void)
+{
+    float wheel_circumference_m = (float)M_PI * WHEEL_DIAMETER_M;
+    float wheel_rps = motor_speed_counts_to_wheel_rps((float)motor_actual_speed);
+
+    return wheel_rps * wheel_circumference_m;
+}
+
+float motor_speed_counts_to_mps(float speed_counts)
+{
+    float wheel_circumference_m = (float)M_PI * WHEEL_DIAMETER_M;
+
+    return motor_speed_counts_to_wheel_rps(speed_counts) * wheel_circumference_m;
+}
+
+int16 motor_speed_mps_to_counts(float speed_mps)
+{
+    float wheel_circumference_m = (float)M_PI * WHEEL_DIAMETER_M;
+    float speed_counts = (speed_mps / wheel_circumference_m) *
+                         MOTOR_SPEED_LOOP_PERIOD_S *
+                         ENCODER_TURNS_PER_WHEEL_TURN *
+                         ENCODER_PULSES_PER_ENCODER_TURN;
+    int32 rounded_counts = (speed_counts >= 0.0f) ?
+                           (int32)(speed_counts + 0.5f) :
+                           (int32)(speed_counts - 0.5f);
+
+    if (rounded_counts > 32767)
+    {
+        rounded_counts = 32767;
+    }
+    else if (rounded_counts < -32768)
+    {
+        rounded_counts = -32768;
+    }
+
+    return (int16)rounded_counts;
+}
+
+float motor_get_target_speed_mps(void)
+{
+    return motor_speed_counts_to_mps((float)motor_target_speed);
+}
+
+float motor_get_actual_speed_mps(void)
+{
+    return motor_speed_counts_to_mps((float)motor_actual_speed);
+}
+
+float motor_encoder_counts_to_m(float counts)
+{
+    float wheel_circumference_m = (float)M_PI * WHEEL_DIAMETER_M;
+
+    return (counts / ENCODER_PULSES_PER_ENCODER_TURN) /
+           ENCODER_TURNS_PER_WHEEL_TURN *
+           wheel_circumference_m;
+}
+
+float motor_get_total_distance_m(void)
+{
+    return motor_encoder_counts_to_m((float)encoder_physical_total);
 }
 
 void motor_speed_pid_init(void)

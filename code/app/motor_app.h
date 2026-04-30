@@ -26,6 +26,13 @@ void motor_set_duty(int16 duty);
 void encoder_count(void);
 void encoder_feedback_reset(void);
 void motor_refresh_status(void);
+float motor_speed_counts_to_mps(float speed_counts);
+int16 motor_speed_mps_to_counts(float speed_mps);
+float motor_get_target_speed_mps(void);
+float motor_get_actual_speed_mps(void);
+float motor_get_display_speed_mps(void);
+float motor_encoder_counts_to_m(float counts);
+float motor_get_total_distance_m(void);
 
 extern PID_T  motor_speed_pid;
 extern int16  motor_target_speed;
