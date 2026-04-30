@@ -152,7 +152,6 @@ float motor_get_display_speed_mps(void)
 float motor_speed_counts_to_mps(float speed_counts)
 {
     float wheel_circumference_m = (float)M_PI * WHEEL_DIAMETER_M;
-
     return motor_speed_counts_to_wheel_rps(speed_counts) * wheel_circumference_m;
 }
 
@@ -192,7 +191,6 @@ float motor_get_actual_speed_mps(void)
 float motor_encoder_counts_to_m(float counts)
 {
     float wheel_circumference_m = (float)M_PI * WHEEL_DIAMETER_M;
-
     return (counts / ENCODER_PULSES_PER_ENCODER_TURN) /
            ENCODER_TURNS_PER_WHEEL_TURN *
            wheel_circumference_m;

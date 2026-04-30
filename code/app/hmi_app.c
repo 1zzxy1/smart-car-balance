@@ -32,10 +32,8 @@
 #define HMI_LINE_BUFFER_SIZE        (48U)
 #define HMI_MAX_VISIBLE_CHARS       (30U)
 
-/* 按住自动重复：首次按下立即触发，之后每 200ms 重发一次 */
+/* Trigger once on press, then repeat every 200 ms while held. */
 #define HMI_KEY_DEBOUNCE_MS         (200U)
-
-#define HMI_YAW_LOCK_DELAY_MS   (500U)
 
 static uint8  hmi_display_mode = 0U;
 static uint8  hmi_display_mode_last = 0xFFU;
@@ -44,8 +42,6 @@ static int16  hmi_servo_test_offset = 0;
 static uint32 hmi_last_display_tick = 0U;
 static uint32 hmi_last_telemetry_tick = 0U;
 static uint32 hmi_last_driver_refresh_tick = 0U;
-static uint8  hmi_yaw_lock_pending = 0U;
-static uint32 hmi_yaw_lock_tick = 0U;
 
 static const gpio_pin_enum hmi_key_pins[KEY_NUMBER] = KEY_LIST;
 static uint32 hmi_key_last_trigger[KEY_NUMBER] = {0U};
@@ -57,7 +53,7 @@ static uint8 hmi_switch_active(gpio_pin_enum pin)
 
 static void hmi_sendf(const char *format, ...)
 {
-    char buffer[320];
+    char buffer[192];
     va_list args;
     int length;
 
@@ -119,10 +115,6 @@ static void hmi_apply_servo_test_mode(void)
     }
 }
 
-/* 按键事件：按下 + 距上次触发至少 HMI_KEY_DEBOUNCE_MS 返回 1。
- * 换掉了 zf_device_key 的状态机——那套要在"松手那一瞬"才把 SHORT_PRESS 写进状态，
- * hmi scan 错过那 10ms 窗口事件就丢了（这是 "按键失灵" 的根源）。
- * 现在改成按下即触发，按住会每 200ms 自动重发一次，丢不了。*/
 static uint8 hmi_key_edge(key_index_enum key)
 {
     if ((0 == gpio_get_level(hmi_key_pins[key])) &&
@@ -138,14 +130,42 @@ static void hmi_handle_keys(void)
 {
     if (hmi_key_edge(KEY_1))
     {
-        motor_set_target_speed(motor_target_speed + HMI_SPEED_STEP);
+        if (0U == hmi_display_mode) { angle_pid.kp += 0.1f; }
+        else                        { gyro_pid.kp  += 0.1f; }
     }
 
     if (hmi_key_edge(KEY_2))
     {
-        int16 new_speed = motor_target_speed - HMI_SPEED_STEP;
-        if (new_speed < 0) { new_speed = 0; }
-        motor_set_target_speed(new_speed);
+        if (0U == hmi_display_mode)
+        {
+            angle_pid.kp -= 0.1f;
+            if (angle_pid.kp < 0.0f) { angle_pid.kp = 0.0f; }
+        }
+        else
+        {
+            gyro_pid.kp -= 0.1f;
+            if (gyro_pid.kp < 0.0f) { gyro_pid.kp = 0.0f; }
+        }
+    }
+
+    if (hmi_key_edge(KEY_3))
+    {
+        if (0U == hmi_display_mode) { angle_pid.kd += 0.05f; }
+        else                        { gyro_pid.kd  += 0.05f; }
+    }
+
+    if (hmi_key_edge(KEY_4))
+    {
+        if (0U == hmi_display_mode)
+        {
+            angle_pid.kd -= 0.05f;
+            if (angle_pid.kd < 0.0f) { angle_pid.kd = 0.0f; }
+        }
+        else
+        {
+            gyro_pid.kd -= 0.05f;
+            if (gyro_pid.kd < 0.0f) { gyro_pid.kd = 0.0f; }
+        }
     }
 }
 
@@ -159,17 +179,16 @@ static void hmi_update_inputs(void)
 
     if (new_motor_enabled && !hmi_motor_enabled)
     {
+        balance_lock_angle_zero();
+        balance_lock_yaw_target();
         motor_set_enabled(1U);
         if (motor_target_speed == 0)
         {
             motor_set_target_speed(559);
         }
-        hmi_yaw_lock_pending = 1U;
-        hmi_yaw_lock_tick = uwtick;
     }
     else if (!new_motor_enabled && hmi_motor_enabled)
     {
-        /* SW2 下降沿：关电机，motor_set_enabled 内部会 reset PID + duty=0 */
         motor_set_enabled(0U);
     }
 
@@ -178,65 +197,44 @@ static void hmi_update_inputs(void)
 
 static void hmi_update_display(void)
 {
-    uint8 status_ok = (imu_ready && (!hmi_motor_enabled || motor_driver_online)) ? 1U : 0U;
-
     if (hmi_display_mode != hmi_display_mode_last)
     {
         ips114_clear();
         hmi_display_mode_last = hmi_display_mode;
     }
 
-    if (0U == hmi_display_mode)
-    {
-        hmi_show_line(0, "ROLL:%7.2f PIT:%7.2f", roll, pitch);
-        hmi_show_line(1, "YAW:%6.2f YE:%6.2f YT:%5.1f", yaw, yaw_error, yaw_target);
-        hmi_show_line(2, "S:%u M:%u TS:%5d", (unsigned int)scheduler_get_mission_state(), motor_enabled, motor_target_speed);
-        hmi_show_line(3, "DST:%6.2fm AS:%5d", motor_get_total_distance_m(), motor_actual_speed);
-        hmi_show_line(4, "AFB:%6.2f STR:%5.2f", balance_angle_feedback, steering_pid.out);
-        hmi_show_line(5, "TG_A:%6.2f TG_G:%6.2f", target_angle, target_gyro);
-        hmi_show_line(6, "OUT :%6.2f PWM:%5lu", servo_output, (unsigned long)servo_last_duty);
-        hmi_show_line(7, "T:%6lu DU:%5d %s", (unsigned long)uwtick, motor_last_duty, status_ok ? "OK" : "NG");
-    }
-    else
-    {
-        hmi_show_line(0, "GYX :%7.2f GYY:%7.2f", gyro_x_rate, gyro_y_rate);
-        hmi_show_line(1, "GYZ :%7.2f YAW:%7.2f", gyro_z_rate, yaw);
-        hmi_show_line(2, "LRPM:%6d RRPM:%6d", motor_driver_left_rpm, motor_driver_right_rpm);
-        hmi_show_line(3, "EFB :%6d ETOT:%6ld", encoder_data_2, (long)encoder_physical_total);
-        hmi_show_line(4, "FGYR:%6.2f MDU:%5d", balance_filtered_gyro, motor_last_duty);
-        hmi_show_line(5, "TANG:%6.2f TGYR:%6.2f", target_angle, target_gyro);
-        hmi_show_line(6, "SOUT:%6.2f SPWM:%5lu", servo_output, (unsigned long)servo_last_duty);
-        hmi_show_line(7, "S:%u T:%6lu %s", (unsigned int)scheduler_get_mission_state(), (unsigned long)uwtick, motor_driver_online ? "OK" : "NG");
-    }
+    (void)hmi_display_mode;
+
+    hmi_show_line(0, "SPD T:%4.2f A:%4.2f", motor_get_target_speed_mps(), motor_get_actual_speed_mps());
+    hmi_show_line(1, "DST :%6.2f m", motor_get_total_distance_m());
+    hmi_show_line(2, "ENC :%6.2f m/s", motor_get_display_speed_mps());
+    hmi_show_line(3, "GYX :%7.2f", gyro_x_rate);
+    hmi_show_line(4, "GYY :%7.2f", gyro_y_rate);
+    hmi_show_line(5, "GYZ :%7.2f", gyro_z_rate);
+    hmi_show_line(6, "YAW :%7.2f", yaw);
+    hmi_show_line(7, "T:%5lu IMU:%s M1:%s",
+                  (unsigned long)uwtick,
+                  imu_ready ? "OK" : "WAIT",
+                  motor_driver_online ? "OK" : "WAIT");
 }
 
 static void hmi_send_telemetry(void)
 {
-    hmi_sendf("t,state,hd,dst,syaw,tyaw,yt,tys,yaw,ye,gz,ea,ta,str,pit,afb,gy,fgy,tgy,out,pwm,ts,as:"
-              "%lu,%u,%u,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.0f,%lu,%d,%d\r\n",
+    hmi_sendf("%lu,%u,%u,%.3f,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
               (unsigned long)uwtick,
               (unsigned int)scheduler_get_mission_state(),
               (unsigned int)balance_heading_enabled,
               motor_get_total_distance_m(),
+              motor_get_actual_speed_mps(),
               scheduler_get_mission_start_yaw(),
               scheduler_get_mission_turn_target_yaw(),
               yaw_target,
               balance_get_target_yaw_smooth(),
               yaw,
               yaw_error,
-              gyro_z_rate,
-              expect_angle,
-              target_angle,
               steering_pid.out,
-              pitch,
-              balance_angle_feedback,
-              gyro_y_rate,
-              balance_filtered_gyro,
-              target_gyro,
-              servo_output,
-              (unsigned long)servo_last_duty,
-              motor_target_speed,
-              motor_actual_speed);
+              expect_angle,
+              target_angle);
 }
 
 void hmi_init(void)
@@ -262,12 +260,6 @@ void hmi_proc(void)
     hmi_update_inputs();
     hmi_handle_keys();
     hmi_apply_servo_test_mode();
-
-    if (hmi_yaw_lock_pending && ((uwtick - hmi_yaw_lock_tick) >= HMI_YAW_LOCK_DELAY_MS))
-    {
-        balance_lock_yaw_target();
-        hmi_yaw_lock_pending = 0U;
-    }
 
     if ((uwtick - hmi_last_driver_refresh_tick) >= HMI_DRIVER_REFRESH_MS)
     {

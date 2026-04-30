@@ -1,53 +1,56 @@
 #ifndef __PID_H
 #define __PID_H
 
-/* pid结构体 */
+/* pid缁撴瀯浣?*/
 typedef struct
 {
-    float kp;					/* 比例 */
-    float ki;					/* 积分 */
-    float kd;					/* 微分 */
-    float target;				/* 目标值 */
-    float current;				/* 当前值 */
-    float out;					/* 执行量 */
-    float limit;                /* PID(out)输出限幅值 */
+    float kp;                    /* 姣斾緥 */
+    float ki;                    /* 绉垎 */
+    float kd;                    /* 寰垎 */
+    float target;                /* 鐩爣鍊?*/
+    float current;               /* 褰撳墠鍊?*/
+    float out;                   /* 鎵ц閲?*/
+    float limit;                /* PID(out)杈撳嚭闄愬箙鍊?*/
 
-    float error;				/* 当前误差 */
-    float last_error;			/* 上一次误差 */
-    float last2_error;			/* 上上次误差 */
-    float last_out;             /* 上一次执行量 */
-	float integral;				/* 积分（累加） */
-	float p_out,i_out,d_out;	/* 比例、积分、微分值 */
-}PID_T;
+    float error;                 /* 褰撳墠璇樊 */
+    float last_error;            /* 涓婁竴娆¤宸?*/
+    float last2_error;           /* 涓婁笂娆¤宸?*/
+    float last_out;              /* 涓婁竴娆℃墽琛岄噺 */
+    float integral;              /* 绉垎锛堢疮鍔狅級 */
+    float p_out, i_out, d_out;   /* 姣斾緥銆佺Н鍒嗐€佸井鍒嗗€?*/
+} PID_T;
 
 /*
-    提供给用户调用的API
+    鎻愪緵缁欑敤鎴疯皟鐢ㄧ殑API
 */
-/* PID初始化 */
+/* PID鍒濆鍖?*/
 void pid_init(PID_T * _tpPID, float _kp, float _ki, float _kd, float _target, float _limit);
 
-/* 设置PID目标值 */
+/* 璁剧疆PID鐩爣鍊?*/
 void pid_set_target(PID_T * _tpPID, float _target);
 
-/* 设置PID参数 */
+/* 璁剧疆PID鍙傛暟 */
 void pid_set_params(PID_T * _tpPID, float _kp, float _ki, float _kd);
 
-/* 设置PID输出限幅 */
+/* 璁剧疆PID杈撳嚭闄愬箙 */
 void pid_set_limit(PID_T * _tpPID, float _limit);
 
-/* 重置PID控制器 */
+/* 閲嶇疆PID鎺у埗鍣?*/
 void pid_reset(PID_T * _tpPID);
 
-/* 计算位置式PID */
+/* 璁＄畻浣嶇疆寮廝ID */
 float pid_calculate_positional(PID_T * _tpPID, float _current);
 
-/* 计算增量式PID */
+/* 璁＄畻澧為噺寮廝ID */
 float pid_calculate_incremental(PID_T * _tpPID, float _current);
 
-/* 限幅函数 */
+/* 鏍规嵁澶栭儴璇樊璁＄畻PID杈撳嚭 */
+float pid_calculate_by_error(PID_T * _tpPID, float _error);
+
+/* 闄愬箙鍑芥暟 */
 float pid_constrain(float value, float min, float max);
-  
-/* 积分限幅函数 */  
+
+/* 绉垎闄愬箙鍑芥暟 */
 void __attribute__((unused)) pid_app_limit_integral(PID_T *pid, float min, float max);
 
-#endif 
+#endif

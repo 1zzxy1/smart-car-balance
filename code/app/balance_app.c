@@ -2,30 +2,27 @@
  * balance_app.c
  *
  * Three-stage cascade balance:
- * - 20 ms steering loop: yaw error → expect_angle offset
- * - 5 ms angle loop: pitch error → target gyro rate
- * - 1 ms gyro loop: gyro error → servo output
+ * - 20 ms steering loop: yaw error -> expect_angle offset
+ * - 5 ms angle loop: pitch error -> target gyro rate
+ * - 1 ms gyro loop: gyro error -> servo output
  */
 
 #include "balance_app.h"
 
 #include "imu_app.h"
-#include "motor_app.h"
 #include "servo_app.h"
 
 #define BALANCE_EXPECT_ANGLE_DEFAULT (0.0f)
-#define BALANCE_FALL_THRESHOLD      (25.0f)
 
 #define BALANCE_HEADING_STEP        (1.5f)
 
 #define BALANCE_STEERING_KP         (0.15f)
 #define BALANCE_STEERING_KI         (0.0f)
 #define BALANCE_STEERING_KD         (0.05f)
-#define BALANCE_STEERING_OUT_LIMIT  (8.0f)
-#define BALANCE_STEERING_INT_LIMIT  (20.0f)
+#define BALANCE_STEERING_OUT_LIMIT  (3.5f)
 
 #define BALANCE_ANGLE_KP            (8.3f)
-#define BALANCE_ANGLE_KI            (0.02f)
+#define BALANCE_ANGLE_KI            (0.005f)
 #define BALANCE_ANGLE_KD            (-0.3f)
 #define BALANCE_ANGLE_OUT_LIMIT     (150.0f)
 #define BALANCE_ANGLE_INT_LIMIT     (30.0f)
@@ -35,9 +32,9 @@
 #define BALANCE_GYRO_KD             (0.0f)
 #define BALANCE_GYRO_OUT_LIMIT      (2640.0f)
 #define BALANCE_GYRO_INPUT_LIMIT    (800.0f)
-#define BALANCE_GYRO_LPF_ALPHA      (0.40f)
+#define BALANCE_GYRO_LPF_ALPHA      (0.20f)
 
-#define BALANCE_SERVO_SAFE_LIMIT    (1650.0f)
+#define BALANCE_SERVO_SAFE_LIMIT    (990.0f)
 
 PID_T steering_pid;
 PID_T angle_pid;
@@ -57,7 +54,6 @@ uint8 balance_enabled = 0U;
 uint8 balance_heading_enabled = 1U;
 uint8 balance_zero_calibrated = 1U;
 
-static float steering_output = 0.0f;
 static float target_yaw_smooth = 0.0f;
 static uint8 balance_servo_test_enabled = 0U;
 static int16 balance_servo_test_offset = 0;
@@ -102,7 +98,6 @@ static void balance_reset_state(void)
     target_angle = expect_angle;
     target_gyro = 0.0f;
     servo_output = 0.0f;
-    steering_output = 0.0f;
     target_yaw_smooth = yaw_target;
     balance_angle_feedback = 0.0f;
     balance_gyro_feedback = 0.0f;
@@ -193,7 +188,7 @@ void balance_lock_yaw_target(void)
 {
     yaw_target = yaw;
     target_yaw_smooth = yaw;
-    steering_output = 0.0f;
+    target_angle = expect_angle;
     pid_reset(&steering_pid);
 }
 
@@ -210,7 +205,6 @@ float balance_get_target_yaw_smooth(void)
 void balance_set_heading_enabled(uint8 enabled)
 {
     balance_heading_enabled = enabled ? 1U : 0U;
-    steering_output = 0.0f;
     pid_reset(&steering_pid);
 
     if (!balance_heading_enabled)
@@ -227,11 +221,9 @@ void balance_set_heading_enabled(uint8 enabled)
 void balance_steering_loop(void)
 {
     float heading_error;
-    float steer_error;
 
     if (!balance_enabled || !balance_heading_enabled)
     {
-        steering_output = 0.0f;
         yaw_error = 0.0f;
         target_yaw_smooth = yaw_target;
         target_angle = expect_angle;
@@ -254,34 +246,7 @@ void balance_steering_loop(void)
     }
 
     yaw_error = normalize_angle(yaw - target_yaw_smooth);
-    steer_error = yaw_error;
-
-    steering_pid.integral += steer_error;
-    if (steering_pid.integral > BALANCE_STEERING_INT_LIMIT)
-    {
-        steering_pid.integral = BALANCE_STEERING_INT_LIMIT;
-    }
-    else if (steering_pid.integral < -BALANCE_STEERING_INT_LIMIT)
-    {
-        steering_pid.integral = -BALANCE_STEERING_INT_LIMIT;
-    }
-
-    steering_pid.p_out = steering_pid.kp * steer_error;
-    steering_pid.i_out = steering_pid.ki * steering_pid.integral;
-    steering_pid.d_out = steering_pid.kd * (steer_error - steering_pid.last_error);
-    steering_pid.out = steering_pid.p_out + steering_pid.i_out + steering_pid.d_out;
-
-    if (steering_pid.out > BALANCE_STEERING_OUT_LIMIT)
-    {
-        steering_pid.out = BALANCE_STEERING_OUT_LIMIT;
-    }
-    else if (steering_pid.out < -BALANCE_STEERING_OUT_LIMIT)
-    {
-        steering_pid.out = -BALANCE_STEERING_OUT_LIMIT;
-    }
-
-    steering_pid.last_error = steer_error;
-    steering_output = steering_pid.out;
+    target_angle = expect_angle + pid_calculate_by_error(&steering_pid, yaw_error);
 }
 
 void balance_angle_loop(void)
@@ -300,7 +265,6 @@ void balance_angle_loop(void)
         return;
     }
 
-    target_angle = expect_angle + steering_output;
     angle_error = target_angle - balance_angle_feedback;
 
     angle_pid.integral += angle_error;
@@ -357,14 +321,6 @@ void balance_gyro_loop(void)
         gyro_pid.integral = 0.0f;
         gyro_pid.last_error = 0.0f;
         gyro_pid.out = 0.0f;
-        balance_apply_servo_output(0.0f);
-        return;
-    }
-
-    if ((balance_angle_feedback > BALANCE_FALL_THRESHOLD) ||
-        (balance_angle_feedback < -BALANCE_FALL_THRESHOLD))
-    {
-        motor_set_enabled(0U);
         balance_apply_servo_output(0.0f);
         return;
     }
