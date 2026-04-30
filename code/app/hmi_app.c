@@ -57,7 +57,7 @@ static uint8 hmi_switch_active(gpio_pin_enum pin)
 
 static void hmi_sendf(const char *format, ...)
 {
-    char buffer[256];
+    char buffer[320];
     va_list args;
     int length;
 
@@ -190,8 +190,8 @@ static void hmi_update_display(void)
     {
         hmi_show_line(0, "ROLL:%7.2f PIT:%7.2f", roll, pitch);
         hmi_show_line(1, "YAW:%6.2f YE:%6.2f YT:%5.1f", yaw, yaw_error, yaw_target);
-        hmi_show_line(2, "M:%u TS:%5d AS:%5d", motor_enabled, motor_target_speed, motor_actual_speed);
-        hmi_show_line(3, "ENC :%6d TOT:%6ld", encoder_physical, (long)encoder_physical_total);
+        hmi_show_line(2, "S:%u M:%u TS:%5d", (unsigned int)scheduler_get_mission_state(), motor_enabled, motor_target_speed);
+        hmi_show_line(3, "DST:%6.2fm AS:%5d", motor_get_total_distance_m(), motor_actual_speed);
         hmi_show_line(4, "AFB:%6.2f STR:%5.2f", balance_angle_feedback, steering_pid.out);
         hmi_show_line(5, "TG_A:%6.2f TG_G:%6.2f", target_angle, target_gyro);
         hmi_show_line(6, "OUT :%6.2f PWM:%5lu", servo_output, (unsigned long)servo_last_duty);
@@ -206,19 +206,37 @@ static void hmi_update_display(void)
         hmi_show_line(4, "FGYR:%6.2f MDU:%5d", balance_filtered_gyro, motor_last_duty);
         hmi_show_line(5, "TANG:%6.2f TGYR:%6.2f", target_angle, target_gyro);
         hmi_show_line(6, "SOUT:%6.2f SPWM:%5lu", servo_output, (unsigned long)servo_last_duty);
-        hmi_show_line(7, "T:%6lu %s", (unsigned long)uwtick, motor_driver_online ? "OK" : "NG");
+        hmi_show_line(7, "S:%u T:%6lu %s", (unsigned int)scheduler_get_mission_state(), (unsigned long)uwtick, motor_driver_online ? "OK" : "NG");
     }
 }
 
 static void hmi_send_telemetry(void)
 {
-    hmi_sendf("t,pit,afb,tang,gy,fgy,tgy,out,pwm,ts,as,yaw,ye,str:"
-              "%lu,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.0f,%lu,%d,%d,%.1f,%.1f,%.2f\r\n",
-              (unsigned long)uwtick, pitch, balance_angle_feedback,
-              target_angle, gyro_y_rate, balance_filtered_gyro,
-              target_gyro, servo_output, (unsigned long)servo_last_duty,
-              motor_target_speed, motor_actual_speed,
-              yaw, yaw_error, steering_pid.out);
+    hmi_sendf("t,state,hd,dst,syaw,tyaw,yt,tys,yaw,ye,gz,ea,ta,str,pit,afb,gy,fgy,tgy,out,pwm,ts,as:"
+              "%lu,%u,%u,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.0f,%lu,%d,%d\r\n",
+              (unsigned long)uwtick,
+              (unsigned int)scheduler_get_mission_state(),
+              (unsigned int)balance_heading_enabled,
+              motor_get_total_distance_m(),
+              scheduler_get_mission_start_yaw(),
+              scheduler_get_mission_turn_target_yaw(),
+              yaw_target,
+              balance_get_target_yaw_smooth(),
+              yaw,
+              yaw_error,
+              gyro_z_rate,
+              expect_angle,
+              target_angle,
+              steering_pid.out,
+              pitch,
+              balance_angle_feedback,
+              gyro_y_rate,
+              balance_filtered_gyro,
+              target_gyro,
+              servo_output,
+              (unsigned long)servo_last_duty,
+              motor_target_speed,
+              motor_actual_speed);
 }
 
 void hmi_init(void)
