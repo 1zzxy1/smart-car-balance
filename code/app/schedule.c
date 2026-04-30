@@ -6,10 +6,44 @@
 
 #include "scheduler.h"
 
+#include <math.h>
+
+#include "balance_app.h"
 #include "hmi_app.h"
+#include "imu_app.h"
+#include "motor_app.h"
+
+#define MISSION_ARMING_MS           (600U)
+#define MISSION_GO_DISTANCE_M       (9.0f)
+#define MISSION_RUN_SPEED_MPS       (1.45f)
+#define MISSION_OPEN_TURN_ANGLE     (8.0f)
+#define MISSION_RELOCK_ERROR_DEG    (20.0f)
+#define MISSION_LEAN_BLEED_MS       (300U)
+#define MISSION_TURN_YAW_BIAS_DEG   (0.0f)
+
+typedef enum
+{
+    MISSION_IDLE = 0,
+    MISSION_ARMING,
+    MISSION_GO_STRAIGHT,
+    MISSION_OPEN_TURN,
+    MISSION_LEAN_BLEED,
+    MISSION_BACK_HEADING
+} mission_state_enum;
 
 uint8_t task_num;
 uint32_t uwtick = 0;
+
+static mission_state_enum mission_state = MISSION_IDLE;
+static float mission_start_yaw = 0.0f;
+static float mission_turn_target_yaw = 0.0f;
+static uint32 mission_arm_tick = 0U;
+static uint32 mission_bleed_tick = 0U;
+
+static void mission_proc(void);
+static void mission_arm(void);
+static void mission_start_first_task(void);
+static void mission_reset(void);
 
 typedef struct
 {
@@ -20,12 +54,128 @@ typedef struct
 
 static task_t scheduler_task[] =
 {
+    {mission_proc, 10U, 0U},
     {hmi_proc, 10U, 0U},
 };
+
+static void mission_arm(void)
+{
+    mission_arm_tick = uwtick;
+    motor_set_target_speed(motor_speed_mps_to_counts(MISSION_RUN_SPEED_MPS));
+    mission_state = MISSION_ARMING;
+}
+
+static void mission_start_first_task(void)
+{
+    mission_start_yaw = yaw;
+    mission_turn_target_yaw = normalize_angle(mission_start_yaw +
+                                              180.0f +
+                                              MISSION_TURN_YAW_BIAS_DEG);
+
+    encoder_feedback_reset();
+    balance_set_expect_angle(0.0f);
+    balance_set_yaw_target(mission_start_yaw);
+    balance_set_heading_enabled(1U);
+    motor_set_target_speed(motor_speed_mps_to_counts(MISSION_RUN_SPEED_MPS));
+
+    mission_state = MISSION_GO_STRAIGHT;
+}
+
+static void mission_reset(void)
+{
+    if (MISSION_IDLE != mission_state)
+    {
+        balance_set_expect_angle(0.0f);
+        balance_set_heading_enabled(1U);
+        mission_state = MISSION_IDLE;
+    }
+}
+
+static void mission_proc(void)
+{
+    float distance_m;
+    float turn_error_deg;
+
+    if (!motor_enabled)
+    {
+        mission_reset();
+        return;
+    }
+
+    if (MISSION_IDLE == mission_state)
+    {
+        mission_arm();
+    }
+
+    motor_set_target_speed(motor_speed_mps_to_counts(MISSION_RUN_SPEED_MPS));
+
+    switch (mission_state)
+    {
+        case MISSION_ARMING:
+            if ((uwtick - mission_arm_tick) >= MISSION_ARMING_MS)
+            {
+                mission_start_first_task();
+            }
+            break;
+
+        case MISSION_GO_STRAIGHT:
+            distance_m = fabsf(motor_get_total_distance_m());
+            if (distance_m >= MISSION_GO_DISTANCE_M)
+            {
+                balance_set_heading_enabled(0U);
+                balance_set_expect_angle(MISSION_OPEN_TURN_ANGLE);
+                mission_state = MISSION_OPEN_TURN;
+            }
+            break;
+
+        case MISSION_OPEN_TURN:
+            turn_error_deg = fabsf(normalize_angle(mission_turn_target_yaw - yaw));
+            if (turn_error_deg <= MISSION_RELOCK_ERROR_DEG)
+            {
+                balance_set_expect_angle(0.0f);
+                balance_set_heading_enabled(0U);
+                mission_bleed_tick = uwtick;
+                mission_state = MISSION_LEAN_BLEED;
+            }
+            break;
+
+        case MISSION_LEAN_BLEED:
+            if ((uwtick - mission_bleed_tick) >= MISSION_LEAN_BLEED_MS)
+            {
+                balance_set_expect_angle(0.0f);
+                balance_set_yaw_target(mission_turn_target_yaw);
+                balance_set_heading_enabled(1U);
+                mission_state = MISSION_BACK_HEADING;
+            }
+            break;
+
+        case MISSION_BACK_HEADING:
+            break;
+
+        default:
+            mission_reset();
+            break;
+    }
+}
 
 void scheduler_init(void)
 {
     task_num = (uint8_t)(sizeof(scheduler_task) / sizeof(task_t));
+}
+
+uint8 scheduler_get_mission_state(void)
+{
+    return (uint8)mission_state;
+}
+
+float scheduler_get_mission_start_yaw(void)
+{
+    return mission_start_yaw;
+}
+
+float scheduler_get_mission_turn_target_yaw(void)
+{
+    return mission_turn_target_yaw;
 }
 
 void scheduler_run(void)
