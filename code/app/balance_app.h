@@ -22,12 +22,16 @@ extern float balance_filtered_gyro;
 extern float yaw_target;
 extern float yaw_error;
 extern uint8 balance_enabled;
+extern uint8 balance_heading_enabled;
 extern uint8 balance_zero_calibrated;
 
 void balance_init(void);
 void balance_set_enabled(uint8 enabled);
 void balance_lock_angle_zero(void);
 void balance_lock_yaw_target(void);
+void balance_set_yaw_target(float target);
+float balance_get_target_yaw_smooth(void);
+void balance_set_heading_enabled(uint8 enabled);
 void balance_set_expect_angle(float angle);
 void balance_set_servo_test_enabled(uint8 enabled);
 void balance_set_servo_test_offset(int16 offset);

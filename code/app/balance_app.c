@@ -54,6 +54,7 @@ float balance_filtered_gyro = 0.0f;
 float yaw_target = 0.0f;
 float yaw_error = 0.0f;
 uint8 balance_enabled = 0U;
+uint8 balance_heading_enabled = 1U;
 uint8 balance_zero_calibrated = 1U;
 
 static float steering_output = 0.0f;
@@ -196,16 +197,44 @@ void balance_lock_yaw_target(void)
     pid_reset(&steering_pid);
 }
 
+void balance_set_yaw_target(float target)
+{
+    yaw_target = normalize_angle(target);
+}
+
+float balance_get_target_yaw_smooth(void)
+{
+    return target_yaw_smooth;
+}
+
+void balance_set_heading_enabled(uint8 enabled)
+{
+    balance_heading_enabled = enabled ? 1U : 0U;
+    steering_output = 0.0f;
+    pid_reset(&steering_pid);
+
+    if (!balance_heading_enabled)
+    {
+        yaw_error = 0.0f;
+        target_angle = expect_angle;
+    }
+    else
+    {
+        target_yaw_smooth = yaw;
+    }
+}
+
 void balance_steering_loop(void)
 {
     float heading_error;
     float steer_error;
 
-    if (!balance_enabled)
+    if (!balance_enabled || !balance_heading_enabled)
     {
         steering_output = 0.0f;
         yaw_error = 0.0f;
         target_yaw_smooth = yaw_target;
+        target_angle = expect_angle;
         pid_reset(&steering_pid);
         return;
     }
