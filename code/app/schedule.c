@@ -34,6 +34,7 @@ uint32_t uwtick = 0;
 static mission_state_enum mission_state = MISSION_IDLE;
 static float mission_start_yaw = 0.0f;
 static float mission_turn_target_yaw = 0.0f;
+static float mission_lean_bleed_start_angle = 0.0f;
 static uint32_t mission_lean_bleed_start_tick = 0U;
 
 static void mission_proc(void);
@@ -71,6 +72,7 @@ static void mission_reset(void)
 {
     balance_set_expect_angle(0.0f);
     balance_set_heading_enabled(1U);
+    mission_lean_bleed_start_angle = 0.0f;
     mission_lean_bleed_start_tick = 0U;
     mission_state = MISSION_IDLE;
 }
@@ -109,8 +111,8 @@ static void mission_proc(void)
             turn_error_deg = fabsf(normalize_angle(mission_turn_target_yaw - yaw));
             if (turn_error_deg <= MISSION_RELOCK_ERROR_DEG)
             {
-                balance_set_expect_angle(0.0f);
                 balance_set_heading_enabled(0U);
+                mission_lean_bleed_start_angle = expect_angle;
                 mission_lean_bleed_start_tick = uwtick;
                 mission_state = MISSION_LEAN_BLEED;
             }
@@ -119,9 +121,16 @@ static void mission_proc(void)
         case MISSION_LEAN_BLEED:
             if ((uint32_t)(uwtick - mission_lean_bleed_start_tick) >= MISSION_LEAN_BLEED_MS)
             {
+                balance_set_expect_angle(0.0f);
                 balance_set_yaw_target(mission_turn_target_yaw);
                 balance_set_heading_enabled(1U);
                 mission_state = MISSION_BACK_HEADING;
+            }
+            else
+            {
+                float bleed_ratio = (float)(uwtick - mission_lean_bleed_start_tick) /
+                                    (float)MISSION_LEAN_BLEED_MS;
+                balance_set_expect_angle(mission_lean_bleed_start_angle * (1.0f - bleed_ratio));
             }
             break;
 
