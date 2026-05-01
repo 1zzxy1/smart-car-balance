@@ -16,7 +16,7 @@
 #define MISSION_GO_DISTANCE_M       (9.0f)
 #define MISSION_RUN_SPEED_MPS       (1.45f)
 #define MISSION_OPEN_TURN_ANGLE     (10.0f)
-#define MISSION_RELOCK_ERROR_DEG    (20.0f)
+#define MISSION_RELOCK_ERROR_DEG    (45.0f)
 #define MISSION_LEAN_BLEED_MS       (300U)
 
 typedef enum
