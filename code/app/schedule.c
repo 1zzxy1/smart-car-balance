@@ -15,14 +15,16 @@
 
 #define MISSION_GO_DISTANCE_M       (9.0f)
 #define MISSION_RUN_SPEED_MPS       (1.45f)
-#define MISSION_OPEN_TURN_ANGLE     (8.0f)
+#define MISSION_OPEN_TURN_ANGLE     (10.0f)
 #define MISSION_RELOCK_ERROR_DEG    (20.0f)
+#define MISSION_LEAN_BLEED_MS       (300U)
 
 typedef enum
 {
     MISSION_IDLE = 0,
     MISSION_GO_STRAIGHT,
     MISSION_OPEN_TURN,
+    MISSION_LEAN_BLEED,
     MISSION_BACK_HEADING
 } mission_state_enum;
 
@@ -32,6 +34,7 @@ uint32_t uwtick = 0;
 static mission_state_enum mission_state = MISSION_IDLE;
 static float mission_start_yaw = 0.0f;
 static float mission_turn_target_yaw = 0.0f;
+static uint32_t mission_lean_bleed_start_tick = 0U;
 
 static void mission_proc(void);
 static void mission_start_first_task(void);
@@ -68,6 +71,7 @@ static void mission_reset(void)
 {
     balance_set_expect_angle(0.0f);
     balance_set_heading_enabled(1U);
+    mission_lean_bleed_start_tick = 0U;
     mission_state = MISSION_IDLE;
 }
 
@@ -106,6 +110,15 @@ static void mission_proc(void)
             if (turn_error_deg <= MISSION_RELOCK_ERROR_DEG)
             {
                 balance_set_expect_angle(0.0f);
+                balance_set_heading_enabled(0U);
+                mission_lean_bleed_start_tick = uwtick;
+                mission_state = MISSION_LEAN_BLEED;
+            }
+            break;
+
+        case MISSION_LEAN_BLEED:
+            if ((uint32_t)(uwtick - mission_lean_bleed_start_tick) >= MISSION_LEAN_BLEED_MS)
+            {
                 balance_set_yaw_target(mission_turn_target_yaw);
                 balance_set_heading_enabled(1U);
                 mission_state = MISSION_BACK_HEADING;
