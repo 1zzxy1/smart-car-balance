@@ -15,7 +15,9 @@
 
 #define MISSION_GO_DISTANCE_M       (9.0f)
 #define MISSION_RUN_SPEED_MPS       (1.45f)
-#define MISSION_OPEN_TURN_ANGLE     (10.0f)
+#define MISSION_OPEN_TURN_ANGLE_DEFAULT (10.0f)
+#define MISSION_OPEN_TURN_ANGLE_MIN     (6.0f)
+#define MISSION_OPEN_TURN_ANGLE_MAX     (12.0f)
 #define MISSION_RELOCK_ERROR_DEG    (45.0f)
 #define MISSION_LEAN_BLEED_MS       (300U)
 
@@ -34,6 +36,7 @@ uint32_t uwtick = 0;
 static mission_state_enum mission_state = MISSION_IDLE;
 static float mission_start_yaw = 0.0f;
 static float mission_turn_target_yaw = 0.0f;
+static float mission_open_turn_angle = MISSION_OPEN_TURN_ANGLE_DEFAULT;
 static float mission_lean_bleed_start_angle = 0.0f;
 static uint32_t mission_lean_bleed_start_tick = 0U;
 
@@ -102,7 +105,7 @@ static void mission_proc(void)
             if (distance_m >= MISSION_GO_DISTANCE_M)
             {
                 balance_set_heading_enabled(0U);
-                balance_set_expect_angle(MISSION_OPEN_TURN_ANGLE);
+                balance_set_expect_angle(mission_open_turn_angle);
                 mission_state = MISSION_OPEN_TURN;
             }
             break;
@@ -160,6 +163,25 @@ float scheduler_get_mission_start_yaw(void)
 float scheduler_get_mission_turn_target_yaw(void)
 {
     return mission_turn_target_yaw;
+}
+
+float scheduler_get_mission_open_turn_angle(void)
+{
+    return mission_open_turn_angle;
+}
+
+void scheduler_adjust_mission_open_turn_angle(float delta)
+{
+    mission_open_turn_angle += delta;
+
+    if (mission_open_turn_angle < MISSION_OPEN_TURN_ANGLE_MIN)
+    {
+        mission_open_turn_angle = MISSION_OPEN_TURN_ANGLE_MIN;
+    }
+    if (mission_open_turn_angle > MISSION_OPEN_TURN_ANGLE_MAX)
+    {
+        mission_open_turn_angle = MISSION_OPEN_TURN_ANGLE_MAX;
+    }
 }
 
 void scheduler_run(void)
