@@ -20,6 +20,7 @@
 #define MISSION_OPEN_TURN_ANGLE_MAX     (12.0f)
 #define MISSION_RELOCK_ERROR_DEG    (45.0f)
 #define MISSION_LEAN_BLEED_MS       (300U)
+#define MISSION_BACK_HEADING_HOLD_MS (100U)
 
 typedef enum
 {
@@ -39,9 +40,11 @@ static float mission_turn_target_yaw = 0.0f;
 static float mission_open_turn_angle = MISSION_OPEN_TURN_ANGLE_DEFAULT;
 static float mission_lean_bleed_start_angle = 0.0f;
 static uint32_t mission_lean_bleed_start_tick = 0U;
+static uint32_t mission_back_heading_start_tick = 0U;
 
 static void mission_proc(void);
 static void mission_start_first_task(void);
+static void mission_start_open_turn(void);
 static void mission_reset(void);
 
 typedef struct
@@ -71,12 +74,20 @@ static void mission_start_first_task(void)
     mission_state = MISSION_GO_STRAIGHT;
 }
 
+static void mission_start_open_turn(void)
+{
+    balance_set_heading_enabled(0U);
+    balance_set_expect_angle(mission_open_turn_angle);
+    mission_state = MISSION_OPEN_TURN;
+}
+
 static void mission_reset(void)
 {
     balance_set_expect_angle(0.0f);
     balance_set_heading_enabled(1U);
     mission_lean_bleed_start_angle = 0.0f;
     mission_lean_bleed_start_tick = 0U;
+    mission_back_heading_start_tick = 0U;
     mission_state = MISSION_IDLE;
 }
 
@@ -104,9 +115,7 @@ static void mission_proc(void)
             distance_m = fabsf(motor_get_total_distance_m());
             if (distance_m >= MISSION_GO_DISTANCE_M)
             {
-                balance_set_heading_enabled(0U);
-                balance_set_expect_angle(mission_open_turn_angle);
-                mission_state = MISSION_OPEN_TURN;
+                mission_start_open_turn();
             }
             break;
 
@@ -127,6 +136,7 @@ static void mission_proc(void)
                 balance_set_expect_angle(0.0f);
                 balance_set_yaw_target(mission_turn_target_yaw);
                 balance_set_heading_enabled(1U);
+                mission_back_heading_start_tick = uwtick;
                 mission_state = MISSION_BACK_HEADING;
             }
             else
@@ -138,6 +148,12 @@ static void mission_proc(void)
             break;
 
         case MISSION_BACK_HEADING:
+            if ((uint32_t)(uwtick - mission_back_heading_start_tick) >= MISSION_BACK_HEADING_HOLD_MS)
+            {
+                mission_start_yaw = mission_turn_target_yaw;
+                mission_turn_target_yaw = normalize_angle(mission_turn_target_yaw + 180.0f);
+                mission_start_open_turn();
+            }
             break;
 
         default:
