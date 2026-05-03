@@ -49,6 +49,9 @@ static uint32 hmi_key_last_trigger[KEY_NUMBER] = {0U};
 
 float scheduler_get_mission_open_turn_angle(void);
 void scheduler_adjust_mission_open_turn_angle(float delta);
+float scheduler_get_mission_turn_delta(void);
+float scheduler_get_mission_turn_progress(void);
+float scheduler_get_mission_turn_remaining(void);
 
 static uint8 hmi_switch_active(gpio_pin_enum pin)
 {
@@ -57,7 +60,7 @@ static uint8 hmi_switch_active(gpio_pin_enum pin)
 
 static void hmi_sendf(const char *format, ...)
 {
-    char buffer[192];
+    char buffer[320];
     va_list args;
     int length;
 
@@ -225,7 +228,9 @@ static void hmi_update_display(void)
 
 static void hmi_send_telemetry(void)
 {
-    hmi_sendf("%lu,%u,%u,%.3f,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+    hmi_sendf("%lu,%u,%u,%.3f,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,"
+              "%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.2f,"
+              "%.2f,%.2f,%.2f,%.2f,%lu\r\n",
               (unsigned long)uwtick,
               (unsigned int)scheduler_get_mission_state(),
               (unsigned int)balance_heading_enabled,
@@ -240,7 +245,19 @@ static void hmi_send_telemetry(void)
               steering_pid.out,
               expect_angle,
               target_angle,
-              scheduler_get_mission_open_turn_angle());
+              scheduler_get_mission_open_turn_angle(),
+              scheduler_get_mission_turn_delta(),
+              scheduler_get_mission_turn_progress(),
+              scheduler_get_mission_turn_remaining(),
+              roll,
+              pitch,
+              gyro_y_rate,
+              gyro_z_rate,
+              balance_angle_feedback,
+              target_gyro,
+              balance_gyro_feedback,
+              servo_output,
+              (unsigned long)servo_last_duty);
 }
 
 void hmi_init(void)

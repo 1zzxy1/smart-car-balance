@@ -230,6 +230,21 @@ float scheduler_get_mission_open_turn_angle(void)
     return mission_open_turn_angle;
 }
 
+float scheduler_get_mission_turn_delta(void)
+{
+    return mission_turn_delta_deg;
+}
+
+float scheduler_get_mission_turn_progress(void)
+{
+    return mission_turn_progress_deg;
+}
+
+float scheduler_get_mission_turn_remaining(void)
+{
+    return fabsf(mission_turn_delta_deg) - mission_turn_progress_deg;
+}
+
 void scheduler_adjust_mission_open_turn_angle(float delta)
 {
     mission_open_turn_angle += delta;
