@@ -21,6 +21,9 @@
 #define MISSION_RELOCK_ERROR_DEG    (40.0f)
 #define MISSION_LEAN_BLEED_MS       (300U)
 #define MISSION_BACK_HEADING_HOLD_MS (1000U)
+#define MISSION_FIRST_TURN_DEG      (270.0f)
+#define MISSION_FULL_TURN_DEG       (360.0f)
+#define MISSION_YAW_PROGRESS_SIGN   (-1.0f)
 
 typedef enum
 {
@@ -37,14 +40,19 @@ uint32_t uwtick = 0;
 static mission_state_enum mission_state = MISSION_IDLE;
 static float mission_start_yaw = 0.0f;
 static float mission_turn_target_yaw = 0.0f;
+static float mission_turn_delta_deg = MISSION_FIRST_TURN_DEG;
+static float mission_turn_progress_deg = 0.0f;
+static float mission_turn_last_yaw = 0.0f;
 static float mission_open_turn_angle = MISSION_OPEN_TURN_ANGLE_DEFAULT;
 static float mission_lean_bleed_start_angle = 0.0f;
 static uint32_t mission_lean_bleed_start_tick = 0U;
 static uint32_t mission_back_heading_start_tick = 0U;
+static uint8_t mission_next_full_turn_positive = 0U;
 
 static void mission_proc(void);
 static void mission_start_first_task(void);
 static void mission_start_open_turn(void);
+static void mission_set_turn_delta(float turn_delta_deg);
 static void mission_reset(void);
 
 typedef struct
@@ -63,7 +71,8 @@ static task_t scheduler_task[] =
 static void mission_start_first_task(void)
 {
     mission_start_yaw = yaw;
-    mission_turn_target_yaw = normalize_angle(mission_start_yaw + 180.0f);
+    mission_set_turn_delta(MISSION_FIRST_TURN_DEG);
+    mission_next_full_turn_positive = 0U;
 
     encoder_feedback_reset();
     balance_set_expect_angle(0.0f);
@@ -76,25 +85,42 @@ static void mission_start_first_task(void)
 
 static void mission_start_open_turn(void)
 {
+    float turn_sign = (mission_turn_delta_deg >= 0.0f) ? 1.0f : -1.0f;
+
+    mission_turn_progress_deg = 0.0f;
+    mission_turn_last_yaw = yaw;
     balance_set_heading_enabled(0U);
-    balance_set_expect_angle(mission_open_turn_angle);
+    balance_set_expect_angle(turn_sign * mission_open_turn_angle);
     mission_state = MISSION_OPEN_TURN;
+}
+
+static void mission_set_turn_delta(float turn_delta_deg)
+{
+    mission_turn_delta_deg = turn_delta_deg;
+    mission_turn_target_yaw = normalize_angle(mission_start_yaw + mission_turn_delta_deg);
 }
 
 static void mission_reset(void)
 {
     balance_set_expect_angle(0.0f);
     balance_set_heading_enabled(1U);
+    mission_turn_delta_deg = MISSION_FIRST_TURN_DEG;
+    mission_turn_progress_deg = 0.0f;
+    mission_turn_last_yaw = 0.0f;
     mission_lean_bleed_start_angle = 0.0f;
     mission_lean_bleed_start_tick = 0U;
     mission_back_heading_start_tick = 0U;
+    mission_next_full_turn_positive = 0U;
     mission_state = MISSION_IDLE;
 }
 
 static void mission_proc(void)
 {
     float distance_m;
-    float turn_error_deg;
+    float turn_step_deg;
+    float turn_step_projected_deg;
+    float turn_remaining_deg;
+    float turn_sign;
 
     if (!motor_enabled)
     {
@@ -120,8 +146,17 @@ static void mission_proc(void)
             break;
 
         case MISSION_OPEN_TURN:
-            turn_error_deg = fabsf(normalize_angle(mission_turn_target_yaw - yaw));
-            if (turn_error_deg <= MISSION_RELOCK_ERROR_DEG)
+            turn_sign = (mission_turn_delta_deg >= 0.0f) ? 1.0f : -1.0f;
+            turn_step_deg = normalize_angle(yaw - mission_turn_last_yaw);
+            mission_turn_last_yaw = yaw;
+            turn_step_projected_deg = MISSION_YAW_PROGRESS_SIGN * turn_sign * turn_step_deg;
+            if (turn_step_projected_deg > 0.0f)
+            {
+                mission_turn_progress_deg += turn_step_projected_deg;
+            }
+
+            turn_remaining_deg = fabsf(mission_turn_delta_deg) - mission_turn_progress_deg;
+            if (turn_remaining_deg <= MISSION_RELOCK_ERROR_DEG)
             {
                 balance_set_heading_enabled(0U);
                 mission_lean_bleed_start_angle = expect_angle;
@@ -151,7 +186,16 @@ static void mission_proc(void)
             if ((uint32_t)(uwtick - mission_back_heading_start_tick) >= MISSION_BACK_HEADING_HOLD_MS)
             {
                 mission_start_yaw = mission_turn_target_yaw;
-                mission_turn_target_yaw = normalize_angle(mission_turn_target_yaw + 180.0f);
+                if (mission_next_full_turn_positive)
+                {
+                    mission_set_turn_delta(MISSION_FULL_TURN_DEG);
+                    mission_next_full_turn_positive = 0U;
+                }
+                else
+                {
+                    mission_set_turn_delta(-MISSION_FULL_TURN_DEG);
+                    mission_next_full_turn_positive = 1U;
+                }
                 mission_start_open_turn();
             }
             break;
