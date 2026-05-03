@@ -27,6 +27,12 @@
 #define HMI_SPEED_STEP              (50)
 #define HMI_SERVO_TEST_STEP         (5)
 #define HMI_TURN_ANGLE_STEP         (0.5f)
+#define HMI_ANGLE_KP_STEP           (0.1f)
+#define HMI_ANGLE_KI_STEP           (0.001f)
+#define HMI_ANGLE_KD_STEP           (0.05f)
+#define HMI_ANGLE_KD_MIN            (-2.0f)
+#define HMI_ANGLE_KD_MAX            (1.0f)
+#define HMI_ANGLE_KI_MAX            (0.050f)
 
 #define HMI_LINE_COUNT              (8U)
 #define HMI_LINE_HEIGHT             (16U)
@@ -60,7 +66,7 @@ static uint8 hmi_switch_active(gpio_pin_enum pin)
 
 static void hmi_sendf(const char *format, ...)
 {
-    char buffer[320];
+    char buffer[384];
     va_list args;
     int length;
 
@@ -137,36 +143,50 @@ static void hmi_handle_keys(void)
 {
     if (hmi_key_edge(KEY_1))
     {
-        if (0U == hmi_display_mode) { angle_pid.kp += 0.1f; }
-        else                        { gyro_pid.kp  += 0.1f; }
+        if (0U == hmi_display_mode)
+        {
+            angle_pid.kp += HMI_ANGLE_KP_STEP;
+        }
+        else
+        {
+            angle_pid.ki += HMI_ANGLE_KI_STEP;
+            if (angle_pid.ki > HMI_ANGLE_KI_MAX) { angle_pid.ki = HMI_ANGLE_KI_MAX; }
+        }
     }
 
     if (hmi_key_edge(KEY_2))
     {
         if (0U == hmi_display_mode)
         {
-            angle_pid.kp -= 0.1f;
+            angle_pid.kp -= HMI_ANGLE_KP_STEP;
             if (angle_pid.kp < 0.0f) { angle_pid.kp = 0.0f; }
         }
         else
         {
-            gyro_pid.kp -= 0.1f;
-            if (gyro_pid.kp < 0.0f) { gyro_pid.kp = 0.0f; }
+            angle_pid.ki -= HMI_ANGLE_KI_STEP;
+            if (angle_pid.ki < 0.0f) { angle_pid.ki = 0.0f; }
         }
     }
 
     if (hmi_key_edge(KEY_3))
     {
-        if (0U == hmi_display_mode) { angle_pid.kd += 0.05f; }
-        else                        { scheduler_adjust_mission_open_turn_angle(HMI_TURN_ANGLE_STEP); }
+        if (0U == hmi_display_mode)
+        {
+            angle_pid.kd += HMI_ANGLE_KD_STEP;
+            if (angle_pid.kd > HMI_ANGLE_KD_MAX) { angle_pid.kd = HMI_ANGLE_KD_MAX; }
+        }
+        else
+        {
+            scheduler_adjust_mission_open_turn_angle(HMI_TURN_ANGLE_STEP);
+        }
     }
 
     if (hmi_key_edge(KEY_4))
     {
         if (0U == hmi_display_mode)
         {
-            angle_pid.kd -= 0.05f;
-            if (angle_pid.kd < 0.0f) { angle_pid.kd = 0.0f; }
+            angle_pid.kd -= HMI_ANGLE_KD_STEP;
+            if (angle_pid.kd < HMI_ANGLE_KD_MIN) { angle_pid.kd = HMI_ANGLE_KD_MIN; }
         }
         else
         {
@@ -216,10 +236,10 @@ static void hmi_update_display(void)
     hmi_show_line(2, "ST:%u TURN:%4.1f",
                   (unsigned int)scheduler_get_mission_state(),
                   scheduler_get_mission_open_turn_angle());
-    hmi_show_line(3, "GYX :%7.2f", gyro_x_rate);
-    hmi_show_line(4, "GYY :%7.2f", gyro_y_rate);
-    hmi_show_line(5, "GYZ :%7.2f", gyro_z_rate);
-    hmi_show_line(6, "YAW :%7.2f", yaw);
+    hmi_show_line(3, "AKP:%4.1f AI:%5.3f", angle_pid.kp, angle_pid.ki);
+    hmi_show_line(4, "AD:%5.2f GKP:%4.1f", angle_pid.kd, gyro_pid.kp);
+    hmi_show_line(5, "PIT:%5.1f GY:%5.1f", pitch, gyro_y_rate);
+    hmi_show_line(6, "TG:%5.1f SO:%5.0f", target_gyro, servo_output);
     hmi_show_line(7, "T:%5lu IMU:%s M1:%s",
                   (unsigned long)uwtick,
                   imu_ready ? "OK" : "WAIT",
@@ -230,7 +250,7 @@ static void hmi_send_telemetry(void)
 {
     hmi_sendf("%lu,%u,%u,%.3f,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,"
               "%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.2f,"
-              "%.2f,%.2f,%.2f,%.2f,%lu\r\n",
+              "%.2f,%.2f,%.2f,%.2f,%lu,%.2f,%.4f,%.2f,%.2f\r\n",
               (unsigned long)uwtick,
               (unsigned int)scheduler_get_mission_state(),
               (unsigned int)balance_heading_enabled,
@@ -257,7 +277,11 @@ static void hmi_send_telemetry(void)
               target_gyro,
               balance_gyro_feedback,
               servo_output,
-              (unsigned long)servo_last_duty);
+              (unsigned long)servo_last_duty,
+              angle_pid.kp,
+              angle_pid.ki,
+              angle_pid.kd,
+              gyro_pid.kp);
 }
 
 void hmi_init(void)
