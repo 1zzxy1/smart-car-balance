@@ -13,16 +13,27 @@
 #include "imu_app.h"
 #include "motor_app.h"
 
+/* 起步后先直行的距离，达到后开始执行转圈任务。 */
 #define MISSION_GO_DISTANCE_M       (9.0f)
+/* 任务全程目标速度，单位 m/s。 */
 #define MISSION_RUN_SPEED_MPS       (1.50f)
+/* 默认开环压弯角，越大转弯半径越小，但平衡风险越高。 */
 #define MISSION_OPEN_TURN_ANGLE_DEFAULT (7.0f)
+/* 按键调节压弯角的安全下限。 */
 #define MISSION_OPEN_TURN_ANGLE_MIN     (6.0f)
+/* 按键调节压弯角的安全上限。 */
 #define MISSION_OPEN_TURN_ANGLE_MAX     (12.0f)
+/* 距离本次目标转角还差多少度时，退出开环压弯并进入倾角溜泄。 */
 #define MISSION_RELOCK_ERROR_DEG    (40.0f)
+/* 倾角溜泄时间，期间 expect_angle 从当前压弯角线性降到 0。 */
 #define MISSION_LEAN_BLEED_MS       (200U)
+/* 溜泄后锁住目标航向的保持时间，结束后进入下一次开环转弯。 */
 #define MISSION_BACK_HEADING_HOLD_MS (100U)
+/* 第一次转弯目标角度，用于从直行切入绕圈轨迹。 */
 #define MISSION_FIRST_TURN_DEG      (270.0f)
+/* 后续每次完整绕圈的目标转角绝对值。 */
 #define MISSION_FULL_TURN_DEG       (360.0f)
+/* yaw 增量投影符号，若累计转角方向反了，只改这个符号。 */
 #define MISSION_YAW_PROGRESS_SIGN   (-1.0f)
 
 typedef enum
