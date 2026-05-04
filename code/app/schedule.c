@@ -24,7 +24,7 @@
 /* 按键调节压弯角的安全上限。 */
 #define MISSION_OPEN_TURN_ANGLE_MAX     (12.0f)
 /* 距离本次目标转角还差多少度时，退出开环压弯并进入倾角溜泄。 */
-#define MISSION_RELOCK_ERROR_DEG    (40.0f)
+#define MISSION_RELOCK_ERROR_DEG    (30.0f)
 /* 倾角溜泄时间，期间 expect_angle 从当前压弯角线性降到 0。 */
 #define MISSION_LEAN_BLEED_MS       (200U)
 /* 溜泄后锁住目标航向的保持时间，结束后进入下一次开环转弯。 */
