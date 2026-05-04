@@ -229,17 +229,34 @@ static void hmi_update_display(void)
         hmi_display_mode_last = hmi_display_mode;
     }
 
-    (void)hmi_display_mode;
+    if (0U == hmi_display_mode)
+    {
+        hmi_show_line(0, "BAL PID  K1/2=AKP K3/4=AD");
+        hmi_show_line(1, "AKP:%4.1f AI:%5.3f", angle_pid.kp, angle_pid.ki);
+        hmi_show_line(2, "AD:%5.2f GKP:%4.1f", angle_pid.kd, gyro_pid.kp);
+        hmi_show_line(3, "PIT:%5.1f AFB:%5.1f", pitch, balance_angle_feedback);
+        hmi_show_line(4, "GY:%6.1f GFB:%6.1f", gyro_y_rate, balance_gyro_feedback);
+        hmi_show_line(5, "TG:%6.1f SO:%6.0f", target_gyro, servo_output);
+        hmi_show_line(6, "PWM:%5lu YAW:%6.1f", (unsigned long)servo_last_duty, yaw);
+    }
+    else
+    {
+        hmi_show_line(0, "MISSION K1/2=AI K3/4=TURN");
+        hmi_show_line(1, "ST:%u HD:%u DST:%5.2f",
+                      (unsigned int)scheduler_get_mission_state(),
+                      (unsigned int)balance_heading_enabled,
+                      motor_get_total_distance_m());
+        hmi_show_line(2, "SPD T:%4.2f A:%4.2f", motor_get_target_speed_mps(), motor_get_actual_speed_mps());
+        hmi_show_line(3, "TURN:%4.1f D:%6.1f",
+                      scheduler_get_mission_open_turn_angle(),
+                      scheduler_get_mission_turn_delta());
+        hmi_show_line(4, "PROG:%6.1f REM:%6.1f",
+                      scheduler_get_mission_turn_progress(),
+                      scheduler_get_mission_turn_remaining());
+        hmi_show_line(5, "YAW:%6.1f TGT:%6.1f", yaw, scheduler_get_mission_turn_target_yaw());
+        hmi_show_line(6, "EXP:%5.1f TA:%5.1f", expect_angle, target_angle);
+    }
 
-    hmi_show_line(0, "SPD T:%4.2f A:%4.2f", motor_get_target_speed_mps(), motor_get_actual_speed_mps());
-    hmi_show_line(1, "DST :%6.2f m", motor_get_total_distance_m());
-    hmi_show_line(2, "ST:%u TURN:%4.1f",
-                  (unsigned int)scheduler_get_mission_state(),
-                  scheduler_get_mission_open_turn_angle());
-    hmi_show_line(3, "AKP:%4.1f AI:%5.3f", angle_pid.kp, angle_pid.ki);
-    hmi_show_line(4, "AD:%5.2f GKP:%4.1f", angle_pid.kd, gyro_pid.kp);
-    hmi_show_line(5, "PIT:%5.1f GY:%5.1f", pitch, gyro_y_rate);
-    hmi_show_line(6, "TG:%5.1f SO:%5.0f", target_gyro, servo_output);
     hmi_show_line(7, "T:%5lu IMU:%s M1:%s",
                   (unsigned long)uwtick,
                   imu_ready ? "OK" : "WAIT",
