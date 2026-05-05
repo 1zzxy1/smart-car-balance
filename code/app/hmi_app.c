@@ -31,7 +31,7 @@
 #define HMI_ANGLE_KD_MIN            (-2.0f)
 #define HMI_ANGLE_KD_MAX            (1.0f)
 #define HMI_TURN_ANGLE_COARSE_STEP  (0.5f)
-#define HMI_TURN_ANGLE_FINE_STEP    (0.1f)
+#define HMI_RUN_SPEED_STEP_MPS      (0.10f)
 
 #define HMI_LINE_COUNT              (8U)
 #define HMI_LINE_HEIGHT             (16U)
@@ -53,7 +53,9 @@ static const gpio_pin_enum hmi_key_pins[KEY_NUMBER] = KEY_LIST;
 static uint32 hmi_key_last_trigger[KEY_NUMBER] = {0U};
 
 float scheduler_get_mission_open_turn_angle(void);
+float scheduler_get_mission_run_speed_mps(void);
 void scheduler_adjust_mission_open_turn_angle(float delta);
+void scheduler_adjust_mission_run_speed_mps(float delta);
 float scheduler_get_mission_turn_delta(void);
 float scheduler_get_mission_turn_progress(void);
 float scheduler_get_mission_turn_remaining(void);
@@ -174,7 +176,7 @@ static void hmi_handle_keys(void)
         }
         else
         {
-            scheduler_adjust_mission_open_turn_angle(HMI_TURN_ANGLE_FINE_STEP);
+            scheduler_adjust_mission_run_speed_mps(HMI_RUN_SPEED_STEP_MPS);
         }
     }
 
@@ -187,7 +189,7 @@ static void hmi_handle_keys(void)
         }
         else
         {
-            scheduler_adjust_mission_open_turn_angle(-HMI_TURN_ANGLE_FINE_STEP);
+            scheduler_adjust_mission_run_speed_mps(-HMI_RUN_SPEED_STEP_MPS);
         }
     }
 }
@@ -238,16 +240,18 @@ static void hmi_update_display(void)
     }
     else
     {
-        hmi_show_line(0, "TURN K1/2=0.5 K3/4=0.1");
+        hmi_show_line(0, "TURN K1/2 SPD K3/4");
         hmi_show_line(1, "TURN:%4.1f D:%6.1f",
                       scheduler_get_mission_open_turn_angle(),
                       scheduler_get_mission_turn_delta());
-        hmi_show_line(2, "PROG:%6.1f REM:%6.1f",
+        hmi_show_line(2, "SPD T:%4.2f A:%4.2f",
+                      scheduler_get_mission_run_speed_mps(),
+                      motor_get_actual_speed_mps());
+        hmi_show_line(3, "PROG:%6.1f REM:%6.1f",
                       scheduler_get_mission_turn_progress(),
                       scheduler_get_mission_turn_remaining());
-        hmi_show_line(3, "YAW:%6.1f TGT:%6.1f", yaw, scheduler_get_mission_turn_target_yaw());
-        hmi_show_line(4, "EXP:%5.1f TA:%5.1f", expect_angle, target_angle);
-        hmi_show_line(5, "YE:%6.1f SOUT:%5.2f", yaw_error, steering_pid.out);
+        hmi_show_line(4, "YAW:%6.1f TGT:%6.1f", yaw, scheduler_get_mission_turn_target_yaw());
+        hmi_show_line(5, "EXP:%5.1f TA:%5.1f", expect_angle, target_angle);
         hmi_show_line(6, "ST:%u HD:%u DST:%5.2f",
                       (unsigned int)scheduler_get_mission_state(),
                       (unsigned int)balance_heading_enabled,
@@ -295,7 +299,7 @@ static void hmi_send_telemetry(void)
               angle_pid.kp,
               angle_pid.kd,
               scheduler_get_mission_open_turn_angle(),
-              steering_pid.kp);
+              scheduler_get_mission_run_speed_mps());
 }
 
 void hmi_init(void)

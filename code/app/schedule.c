@@ -16,17 +16,19 @@
 /* 起步后先直行的距离，达到后开始执行转圈任务。 */
 #define MISSION_GO_DISTANCE_M       (9.0f)
 /* 任务全程目标速度，单位 m/s。 */
-#define MISSION_RUN_SPEED_MPS       (1.50f)
+#define MISSION_RUN_SPEED_MPS       (1.00f)
+#define MISSION_RUN_SPEED_MIN_MPS   (0.50f)
+#define MISSION_RUN_SPEED_MAX_MPS   (2.00f)
 /* 默认开环压弯角，越大转弯半径越小，但平衡风险越高。 */
-#define MISSION_OPEN_TURN_ANGLE_DEFAULT (7.0f)
+#define MISSION_OPEN_TURN_ANGLE_DEFAULT (5.0f)
 /* 按键调节压弯角的安全下限。 */
-#define MISSION_OPEN_TURN_ANGLE_MIN     (6.0f)
+#define MISSION_OPEN_TURN_ANGLE_MIN     (1.0f)
 /* 按键调节压弯角的安全上限。 */
 #define MISSION_OPEN_TURN_ANGLE_MAX     (12.0f)
 /* 距离本次目标转角还差多少度时，退出开环压弯并进入倾角溜泄。 */
 #define MISSION_RELOCK_ERROR_DEG    (30.0f)
 /* 倾角溜泄时间，期间 expect_angle 从当前压弯角线性降到 0。 */
-#define MISSION_LEAN_BLEED_MS       (200U)
+#define MISSION_LEAN_BLEED_MS       (100U)
 /* 溜泄后锁住目标航向的保持时间，结束后进入下一次开环转弯。 */
 #define MISSION_BACK_HEADING_HOLD_MS (100U)
 /* 第一次转弯目标角度，用于从直行切入绕圈轨迹。 */
@@ -54,6 +56,7 @@ static float mission_turn_target_yaw = 0.0f;
 static float mission_turn_delta_deg = MISSION_FIRST_TURN_DEG;
 static float mission_turn_progress_deg = 0.0f;
 static float mission_turn_last_yaw = 0.0f;
+static float mission_run_speed_mps = MISSION_RUN_SPEED_MPS;
 static float mission_open_turn_angle = MISSION_OPEN_TURN_ANGLE_DEFAULT;
 static float mission_lean_bleed_start_angle = 0.0f;
 static uint32_t mission_lean_bleed_start_tick = 0U;
@@ -89,7 +92,7 @@ static void mission_start_first_task(void)
     balance_set_expect_angle(0.0f);
     balance_set_yaw_target(mission_start_yaw);
     balance_set_heading_enabled(1U);
-    motor_set_target_speed(motor_speed_mps_to_counts(MISSION_RUN_SPEED_MPS));
+    motor_set_target_speed(motor_speed_mps_to_counts(mission_run_speed_mps));
 
     mission_state = MISSION_GO_STRAIGHT;
 }
@@ -144,7 +147,7 @@ static void mission_proc(void)
         mission_start_first_task();
     }
 
-    motor_set_target_speed(motor_speed_mps_to_counts(MISSION_RUN_SPEED_MPS));
+    motor_set_target_speed(motor_speed_mps_to_counts(mission_run_speed_mps));
 
     switch (mission_state)
     {
@@ -241,6 +244,11 @@ float scheduler_get_mission_open_turn_angle(void)
     return mission_open_turn_angle;
 }
 
+float scheduler_get_mission_run_speed_mps(void)
+{
+    return mission_run_speed_mps;
+}
+
 float scheduler_get_mission_turn_delta(void)
 {
     return mission_turn_delta_deg;
@@ -267,6 +275,20 @@ void scheduler_adjust_mission_open_turn_angle(float delta)
     if (mission_open_turn_angle > MISSION_OPEN_TURN_ANGLE_MAX)
     {
         mission_open_turn_angle = MISSION_OPEN_TURN_ANGLE_MAX;
+    }
+}
+
+void scheduler_adjust_mission_run_speed_mps(float delta)
+{
+    mission_run_speed_mps += delta;
+
+    if (mission_run_speed_mps < MISSION_RUN_SPEED_MIN_MPS)
+    {
+        mission_run_speed_mps = MISSION_RUN_SPEED_MIN_MPS;
+    }
+    if (mission_run_speed_mps > MISSION_RUN_SPEED_MAX_MPS)
+    {
+        mission_run_speed_mps = MISSION_RUN_SPEED_MAX_MPS;
     }
 }
 
