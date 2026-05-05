@@ -30,10 +30,8 @@
 #define HMI_ANGLE_KD_STEP           (0.05f)
 #define HMI_ANGLE_KD_MIN            (-2.0f)
 #define HMI_ANGLE_KD_MAX            (1.0f)
-#define HMI_STEERING_KP_STEP        (0.01f)
-#define HMI_STEERING_KD_STEP        (0.01f)
-#define HMI_STEERING_KP_MAX         (0.50f)
-#define HMI_STEERING_KD_MAX         (0.30f)
+#define HMI_TURN_ANGLE_COARSE_STEP  (0.5f)
+#define HMI_TURN_ANGLE_FINE_STEP    (0.1f)
 
 #define HMI_LINE_COUNT              (8U)
 #define HMI_LINE_HEIGHT             (16U)
@@ -55,6 +53,7 @@ static const gpio_pin_enum hmi_key_pins[KEY_NUMBER] = KEY_LIST;
 static uint32 hmi_key_last_trigger[KEY_NUMBER] = {0U};
 
 float scheduler_get_mission_open_turn_angle(void);
+void scheduler_adjust_mission_open_turn_angle(float delta);
 float scheduler_get_mission_turn_delta(void);
 float scheduler_get_mission_turn_progress(void);
 float scheduler_get_mission_turn_remaining(void);
@@ -149,8 +148,7 @@ static void hmi_handle_keys(void)
         }
         else
         {
-            steering_pid.kp += HMI_STEERING_KP_STEP;
-            if (steering_pid.kp > HMI_STEERING_KP_MAX) { steering_pid.kp = HMI_STEERING_KP_MAX; }
+            scheduler_adjust_mission_open_turn_angle(HMI_TURN_ANGLE_COARSE_STEP);
         }
     }
 
@@ -163,8 +161,7 @@ static void hmi_handle_keys(void)
         }
         else
         {
-            steering_pid.kp -= HMI_STEERING_KP_STEP;
-            if (steering_pid.kp < 0.0f) { steering_pid.kp = 0.0f; }
+            scheduler_adjust_mission_open_turn_angle(-HMI_TURN_ANGLE_COARSE_STEP);
         }
     }
 
@@ -177,8 +174,7 @@ static void hmi_handle_keys(void)
         }
         else
         {
-            steering_pid.kd += HMI_STEERING_KD_STEP;
-            if (steering_pid.kd > HMI_STEERING_KD_MAX) { steering_pid.kd = HMI_STEERING_KD_MAX; }
+            scheduler_adjust_mission_open_turn_angle(HMI_TURN_ANGLE_FINE_STEP);
         }
     }
 
@@ -191,8 +187,7 @@ static void hmi_handle_keys(void)
         }
         else
         {
-            steering_pid.kd -= HMI_STEERING_KD_STEP;
-            if (steering_pid.kd < 0.0f) { steering_pid.kd = 0.0f; }
+            scheduler_adjust_mission_open_turn_angle(-HMI_TURN_ANGLE_FINE_STEP);
         }
     }
 }
@@ -243,12 +238,16 @@ static void hmi_update_display(void)
     }
     else
     {
-        hmi_show_line(0, "HEAD PID K1/2=SKP K3/4=SD");
-        hmi_show_line(1, "SKP:%5.2f SD:%5.2f", steering_pid.kp, steering_pid.kd);
-        hmi_show_line(2, "YE:%6.1f SOUT:%5.2f", yaw_error, steering_pid.out);
-        hmi_show_line(3, "YAW:%6.1f TGT:%6.1f", yaw, yaw_target);
-        hmi_show_line(4, "TSM:%6.1f TA:%5.1f", balance_get_target_yaw_smooth(), target_angle);
-        hmi_show_line(5, "EXP:%5.1f PIT:%5.1f", expect_angle, balance_angle_feedback);
+        hmi_show_line(0, "TURN K1/2=0.5 K3/4=0.1");
+        hmi_show_line(1, "TURN:%4.1f D:%6.1f",
+                      scheduler_get_mission_open_turn_angle(),
+                      scheduler_get_mission_turn_delta());
+        hmi_show_line(2, "PROG:%6.1f REM:%6.1f",
+                      scheduler_get_mission_turn_progress(),
+                      scheduler_get_mission_turn_remaining());
+        hmi_show_line(3, "YAW:%6.1f TGT:%6.1f", yaw, scheduler_get_mission_turn_target_yaw());
+        hmi_show_line(4, "EXP:%5.1f TA:%5.1f", expect_angle, target_angle);
+        hmi_show_line(5, "YE:%6.1f SOUT:%5.2f", yaw_error, steering_pid.out);
         hmi_show_line(6, "ST:%u HD:%u DST:%5.2f",
                       (unsigned int)scheduler_get_mission_state(),
                       (unsigned int)balance_heading_enabled,
@@ -295,8 +294,8 @@ static void hmi_send_telemetry(void)
               (unsigned long)servo_last_duty,
               angle_pid.kp,
               angle_pid.kd,
-              steering_pid.kp,
-              steering_pid.kd);
+              scheduler_get_mission_open_turn_angle(),
+              steering_pid.kp);
 }
 
 void hmi_init(void)
