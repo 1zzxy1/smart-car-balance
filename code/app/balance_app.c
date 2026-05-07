@@ -9,6 +9,8 @@
 
 #include "balance_app.h"
 
+#include <math.h>
+
 #include "imu_app.h"
 #include "servo_app.h"
 
@@ -36,6 +38,11 @@
 #define BALANCE_GYRO_LPF_ALPHA      (0.20f)
 
 #define BALANCE_SERVO_SAFE_LIMIT    (1300.0f)
+
+/* 静态零位锁定参数 */
+#define BALANCE_ZERO_AVG_SAMPLES    (32U)    /* 开机平均采样数（32×5ms=160ms） */
+#define BALANCE_ZERO_AVG_INTERVAL   (5U)     /* 每次采样间隔 ms */
+#define BALANCE_ZERO_STATIC_GYRO    (30.0f)  /* SW2 触发锁零时的静止判定阈值 dps */
 
 PID_T steering_pid;
 PID_T angle_pid;
@@ -133,7 +140,8 @@ void balance_init(void)
              BALANCE_GYRO_OUT_LIMIT);
 
     balance_enabled = 1U;
-    balance_lock_angle_zero();
+    /* balance_init 在 ISR 启动前调用，可阻塞采样 → 用静止平均锁零 */
+    balance_capture_zero_static();
     balance_lock_yaw_target();
     balance_reset_state();
 }
@@ -151,8 +159,37 @@ void balance_set_enabled(uint8 enabled)
     balance_reset_state();
 }
 
+/* 开机静止采样平均：32×5ms=160ms 阻塞，须在 ISR 启动前调用。
+ * 数据原因：SFLP pitch 单帧噪声 0.1-0.3°，KP=22 放大成 2-7° 输出偏置；
+ * 转弯日志显示稳态 angle_pid 输出已偏 +9°，根因就是单帧锁零 */
+void balance_capture_zero_static(void)
+{
+    float sum = 0.0f;
+    uint16 i;
+
+    for (i = 0U; i < BALANCE_ZERO_AVG_SAMPLES; i++)
+    {
+        system_delay_ms(BALANCE_ZERO_AVG_INTERVAL);
+        imu_proc();
+        sum += pitch;
+    }
+
+    balance_angle_zero = sum / (float)BALANCE_ZERO_AVG_SAMPLES;
+    balance_angle_feedback = 0.0f;
+    balance_zero_calibrated = 1U;
+}
+
+/* 运行时锁零（SW2 触发）：加静止守卫，剧烈摆动时拒绝更新，
+ * 避免在车被颠簸或扶手抖动的瞬间锁错零位 */
 void balance_lock_angle_zero(void)
 {
+    if (fabsf(gyro_y_rate) > BALANCE_ZERO_STATIC_GYRO)
+    {
+        /* 不静止：保留上次零位，不强制写入 */
+        balance_angle_feedback = pitch - balance_angle_zero;
+        return;
+    }
+
     balance_angle_zero = pitch;
     balance_angle_feedback = 0.0f;
     balance_zero_calibrated = 1U;
