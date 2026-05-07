@@ -21,15 +21,15 @@
 #define BALANCE_STEERING_KP         (0.15f)
 #define BALANCE_STEERING_KI         (0.0f)
 #define BALANCE_STEERING_KD         (0.05f)
-#define BALANCE_STEERING_OUT_LIMIT  (3.5f)
+#define BALANCE_STEERING_OUT_LIMIT  (1.5f)   /* 原 3.5°，单车而言对下游 angle 环冲击过大 */
 
 #define BALANCE_ANGLE_KP            (22.0f)
 #define BALANCE_ANGLE_KI            (0.005f)
 #define BALANCE_ANGLE_KD            (-0.3f)
-#define BALANCE_ANGLE_OUT_LIMIT     (150.0f)
+#define BALANCE_ANGLE_OUT_LIMIT     (250.0f) /* 原 150 饱和率 21%，放宽让大角度恢复有裕度 */
 #define BALANCE_ANGLE_INT_LIMIT     (30.0f)
 
-#define BALANCE_GYRO_KP             (7.9f)
+#define BALANCE_GYRO_KP             (5.2f)   /* 原 7.9：配合 ANGLE_OUT 250，使 P*OUT≈SAFE_LIMIT，防止 servo 全程撞 1300 */
 #define BALANCE_GYRO_KI             (0.0f)
 #define BALANCE_GYRO_KD             (0.0f)
 #define BALANCE_GYRO_OUT_LIMIT      (1300.0f)   /* 与 SAFE_LIMIT 对齐：原 2640 让 PID 看不到自己被夹 */
