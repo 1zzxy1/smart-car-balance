@@ -25,8 +25,13 @@
 #define MISSION_OPEN_TURN_ANGLE_MIN     (1.0f)
 /* 按键调节压弯角的安全上限。 */
 #define MISSION_OPEN_TURN_ANGLE_MAX     (12.0f)
-/* 距离本次目标转角还差多少度时，退出开环压弯并进入倾角溜泄。 */
-#define MISSION_RELOCK_ERROR_DEG    (30.0f)
+/* OPEN_TURN 内部卸载起点：剩余 100° 时开始把 expect_angle 从 TURN 线性降到 0。
+ * 4.txt 4.txt 显示 remaining≈100° 时 pitch 已 ~9°，再保持 6° 倾角到 remaining=30°
+ * 会让 pitch 滚到 60°；提前在 OPEN_TURN 内部卸载是治本方案。 */
+#define MISSION_TURN_UNLOAD_START_REMAINING_DEG  (100.0f)
+/* 卸载终点 = 进入 LEAN_BLEED 的阈值。原 30° 太晚救不回来，配合 100°→50° 卸载
+ * 让 expect_angle 在进入 LEAN_BLEED 前已自然归 0。 */
+#define MISSION_RELOCK_ERROR_DEG    (50.0f)
 /* 倾角溜泄时间，期间 expect_angle 从当前压弯角线性降到 0。 */
 #define MISSION_LEAN_BLEED_MS       (200U)
 /* 溜泄后锁住目标航向的保持时间，结束后进入下一次开环转弯。 */
@@ -205,6 +210,17 @@ static void mission_proc(void)
                 mission_lean_bleed_start_tick = uwtick;
                 mission_state = MISSION_LEAN_BLEED;
             }
+            else if (turn_remaining_deg <= MISSION_TURN_UNLOAD_START_REMAINING_DEG)
+            {
+                /* OPEN_TURN 后半段：100°→50° 期间 expect_angle 从 TURN 线性降到 0。
+                 * unload_ratio: 1.0 (remaining=100°) → 0.0 (remaining=50°) */
+                float unload_span = MISSION_TURN_UNLOAD_START_REMAINING_DEG -
+                                    MISSION_RELOCK_ERROR_DEG;
+                float unload_ratio = (turn_remaining_deg - MISSION_RELOCK_ERROR_DEG) /
+                                     unload_span;
+                balance_set_expect_angle(mission_turn_ramp_target_angle * unload_ratio);
+            }
+            /* else: remaining > 100°，保持 mission_start_open_turn / TURN_RAMP 末尾设的 TURN 倾角 */
             break;
 
         case MISSION_LEAN_BLEED:
