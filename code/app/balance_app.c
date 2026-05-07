@@ -21,7 +21,7 @@
 #define BALANCE_STEERING_KD         (0.05f)
 #define BALANCE_STEERING_OUT_LIMIT  (3.5f)
 
-#define BALANCE_ANGLE_KP            (8.3f)
+#define BALANCE_ANGLE_KP            (22.0f)
 #define BALANCE_ANGLE_KI            (0.005f)
 #define BALANCE_ANGLE_KD            (-0.3f)
 #define BALANCE_ANGLE_OUT_LIMIT     (150.0f)
