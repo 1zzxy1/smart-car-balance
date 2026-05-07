@@ -30,8 +30,9 @@
 #define BALANCE_GYRO_KP             (7.9f)
 #define BALANCE_GYRO_KI             (0.0f)
 #define BALANCE_GYRO_KD             (0.0f)
-#define BALANCE_GYRO_OUT_LIMIT      (2640.0f)
-#define BALANCE_GYRO_INPUT_LIMIT    (800.0f)
+#define BALANCE_GYRO_OUT_LIMIT      (1300.0f)   /* 与 SAFE_LIMIT 对齐：原 2640 让 PID 看不到自己被夹 */
+#define BALANCE_GYRO_INT_LIMIT      (200.0f)    /* anti-windup 上限，KI=0 时无效 */
+#define BALANCE_GYRO_INPUT_LIMIT    (1500.0f)   /* 原 800 在快速倾倒时反馈失真 */
 #define BALANCE_GYRO_LPF_ALPHA      (0.20f)
 
 #define BALANCE_SERVO_SAFE_LIMIT    (1300.0f)
@@ -327,7 +328,25 @@ void balance_gyro_loop(void)
 
     gyro_error = target_gyro - gyro_filtered;
 
-    gyro_pid.integral += gyro_error;
+    /* 条件积分（anti-windup）：输出已撞限 + 误差仍在加大方向 → 不再累加积分。
+     * 当前 KI=0 此分支冷藏，但调 KI≠0 时防止积分缠绕导致回中迟钝。 */
+    {
+        uint8 saturated_pos = (gyro_pid.out >=  BALANCE_GYRO_OUT_LIMIT) && (gyro_error > 0.0f);
+        uint8 saturated_neg = (gyro_pid.out <= -BALANCE_GYRO_OUT_LIMIT) && (gyro_error < 0.0f);
+        if (!saturated_pos && !saturated_neg)
+        {
+            gyro_pid.integral += gyro_error;
+            if (gyro_pid.integral >  BALANCE_GYRO_INT_LIMIT)
+            {
+                gyro_pid.integral =  BALANCE_GYRO_INT_LIMIT;
+            }
+            else if (gyro_pid.integral < -BALANCE_GYRO_INT_LIMIT)
+            {
+                gyro_pid.integral = -BALANCE_GYRO_INT_LIMIT;
+            }
+        }
+    }
+
     gyro_pid.p_out = gyro_pid.kp * gyro_error;
     gyro_pid.i_out = gyro_pid.ki * gyro_pid.integral;
     gyro_pid.d_out = gyro_pid.kd * (gyro_error - gyro_pid.last_error);
