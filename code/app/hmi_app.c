@@ -266,34 +266,22 @@ static void hmi_update_display(void)
 
 static void hmi_send_telemetry(void)
 {
-    hmi_sendf("%lu,%u,%u,%.3f,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,"
-              "%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.2f,"
-              "%.2f,%.2f,%.2f,%.2f,%lu,%.2f,%.4f,%.2f,%.2f\r\n",
+    /* tick,state,dist,speed,yaw,prog,rem,exp,ta,pit,af,tg,gy,so,pwm,akp,ad,turn,run */
+    hmi_sendf("%lu,%u,%.3f,%.3f,%.2f,%.1f,%.1f,%.2f,%.2f,%.2f,%.2f,"
+              "%.2f,%.2f,%.0f,%lu,%.2f,%.4f,%.2f,%.2f\r\n",
               (unsigned long)uwtick,
               (unsigned int)scheduler_get_mission_state(),
-              (unsigned int)balance_heading_enabled,
               motor_get_total_distance_m(),
               motor_get_actual_speed_mps(),
-              scheduler_get_mission_start_yaw(),
-              scheduler_get_mission_turn_target_yaw(),
-              yaw_target,
-              balance_get_target_yaw_smooth(),
               yaw,
-              yaw_error,
-              steering_pid.out,
-              expect_angle,
-              target_angle,
-              scheduler_get_mission_open_turn_angle(),
-              scheduler_get_mission_turn_delta(),
               scheduler_get_mission_turn_progress(),
               scheduler_get_mission_turn_remaining(),
-              roll,
+              expect_angle,
+              target_angle,
               pitch,
-              gyro_y_rate,
-              gyro_z_rate,
               balance_angle_feedback,
               target_gyro,
-              balance_gyro_feedback,
+              gyro_y_rate,
               servo_output,
               (unsigned long)servo_last_duty,
               angle_pid.kp,
